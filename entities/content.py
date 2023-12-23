@@ -8,6 +8,7 @@ class Operand(ABC):
 
 class Number(Operand):
     def __init__(self, number_value: float) -> None:
+        super().__init__()
         self.number_value = number_value
 
     def get_number_value(self) -> float:
