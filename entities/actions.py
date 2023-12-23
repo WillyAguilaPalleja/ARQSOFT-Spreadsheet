@@ -1,4 +1,4 @@
-from spreadsheet import Spreadsheet
+from .spreadsheet import Spreadsheet
 
 
 class SpreadsheetCreation:

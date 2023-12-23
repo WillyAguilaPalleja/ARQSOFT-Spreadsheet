@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from argument import Argument, Cell, CellRange
-from content import Operand
+from .argument import Argument, Cell, CellRange
+from .content import Operand
 
 
 class Function(ABC, Argument):

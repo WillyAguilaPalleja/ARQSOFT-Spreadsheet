@@ -1,8 +1,8 @@
 from typing import List
 
-from entities.argument import Cell
-from entities.content import Content, Text, Operand
-from entities.operator import Operator
+from .argument import Cell
+from .content import Content, Text, Operand
+from .operator import Operator
 
 
 class Formula(Content):
