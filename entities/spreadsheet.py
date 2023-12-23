@@ -3,12 +3,14 @@ from typing import List
 
 from entities.argument import Cell
 
+
 class AvailableCommandsEnum(str, Enum):
-    RF = 'RF'
-    C = 'C'
-    E = 'E'
-    L = 'L'
-    S = 'S'
+    RF = "RF"
+    C = "C"
+    E = "E"
+    L = "L"
+    S = "S"
+
 
 class Spreadsheet:
     _instance = None
