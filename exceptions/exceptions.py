@@ -17,8 +17,8 @@ class SpreadsheetLocationException(Exception):
     @summary: Exception raised when any spreadsheet was found in path_name or the file did not exist.
     """
 
-    def __init__(self) -> None:
-        self.message = "The spreadsheet location is not valid"
+    def __init__(self, message: Optional[str] = "The spreadsheet location is not valid") -> None:
+        self.message = message
 
 
 class NoCellException(Exception):

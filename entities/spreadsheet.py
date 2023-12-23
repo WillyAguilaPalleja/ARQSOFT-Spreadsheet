@@ -3,7 +3,7 @@ from enum import Enum
 from typing import List
 
 from entities.argument import Cell
-from exceptions.exceptions import BadCommandException
+from exceptions.exceptions import BadCommandException, SpreadsheetLocationException
 from utils import help_message
 
 
@@ -49,6 +49,8 @@ class UserInterface:
             except BadCommandException as exception:
                 print(exception.message)
                 print(help_message)
+            except SpreadsheetLocationException as exception:
+                print(exception.message)
 
 
 class SpreadsheetController:
@@ -68,12 +70,19 @@ class SpreadsheetController:
         @raise BadCommandException: Raises if the command the user has input is not valid.
         @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name or the file did not exist.
         """
+        def read_command_from_a_file(path_name: str):
+            try:
+                with open(path_name, "r") as file:
+                    for line in file:
+                        self.read_command(line)
+            except FileNotFoundError:
+                raise SpreadsheetLocationException(message='The file in the route provided does not exist')
+
         command_splitted = command.split(" ")
         try:
             match command_splitted[0]:
                 case AvailableCommandsEnum.RF:
-                    # Read commands from a file
-                    pass
+                    read_command_from_a_file(path_name=command_splitted[1])
                 case AvailableCommandsEnum.C:
                     return self.create_spreadsheet()
                 case AvailableCommandsEnum.E:
@@ -152,3 +161,15 @@ class SpreadsheetFactory:
         @summary: Creates a list of cells to be used by the Spreadsheet.
         @return: List of cells.
         """
+        list_of_cells: List[Cell] = []
+        columns = 26  # A to Z
+        rows = 100
+
+        for row in range(1, rows + 1):
+            for col_index in range(columns):
+                col_label = chr(ord('A') + col_index)
+                cell_id = f'{col_label}{row}'
+                cell = Cell(cell_id=cell_id)
+                list_of_cells.append(cell)
+
+        return list_of_cells
