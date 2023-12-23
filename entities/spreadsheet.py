@@ -1,22 +1,32 @@
+from enum import Enum
 from typing import List
 
-from .argument import Cell
+from entities.argument import Cell
 
+class AvailableCommandsEnum(str, Enum):
+    RF = 'RF'
+    C = 'C'
+    E = 'E'
+    L = 'L'
+    S = 'S'
 
 class Spreadsheet:
+    _instance = None
+
     def __init__(self) -> None:
-        self.change_in_future = 1
-        self.controller = (
-            SpreadsheetFactory.create_spreadsheet_controller()
-        )  # check singleton
-        self.list_of_cells = SpreadsheetFactory.create_list_of_cells()
+        if not Spreadsheet._instance:
+            Spreadsheet._instance = self
+            self.controller = SpreadsheetFactory.create_spreadsheet_controller()
+            self.list_of_cells = SpreadsheetFactory.create_list_of_cells()
 
 
 class UserInterface:
+    _instance = None
+
     def __init__(self) -> None:
-        self.controller = (
-            SpreadsheetFactory.create_spreadsheet_controller()
-        )  # check singleton
+        if not UserInterface._instance:
+            UserInterface._instance = self
+            self.controller = SpreadsheetFactory.create_spreadsheet_controller()
 
     def send_command(self) -> str:
         """
@@ -26,9 +36,13 @@ class UserInterface:
 
 
 class SpreadsheetController:
+    _instance = None
+
     def __init__(self) -> None:
-        self.spreadsheet = Spreadsheet()
-        self.user_interface = UserInterface()  # check singleton
+        if not SpreadsheetController._instance:
+            SpreadsheetController._instance = self
+            self.spreadsheet = Spreadsheet()
+            self.user_interface = UserInterface()
 
     def read_command(self, command: str) -> Spreadsheet | None:
         """
@@ -41,7 +55,7 @@ class SpreadsheetController:
 
     def create_spreadsheet(self) -> Spreadsheet:
         """
-        @summary: Creates an spreadsheet using the method create_spreadsheet from SpreadsheetCreation.
+        @summary: Creates a spreadsheet using the method create_spreadsheet from SpreadsheetCreation.
         @return: Spreadsheet.
         """
 
@@ -60,7 +74,7 @@ class SpreadsheetController:
         @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name or the file did not exist.
         """
 
-    def edit_cell(self, cell_coordinte: str, new_cell_content: str) -> None:
+    def edit_cell(self, cell_coordinate: str, new_cell_content: str) -> None:
         """
         @summary: Edits the cell given its coordinates and places the new content given using the method edit_cell from CellEdition.
         @param cell_coordinate: Coordinate of the cell where to modify its content.
@@ -74,6 +88,7 @@ class SpreadsheetController:
         @summary: Close the application.
         """
 
+
 class SpreadsheetFactory:
     @staticmethod
     def create_spreadsheet_controller() -> SpreadsheetController:
@@ -81,6 +96,7 @@ class SpreadsheetFactory:
         @summary: Creates the SpreadsheetController to be used.
         @return: SpreadsheetController.
         """
+        return SpreadsheetController()
 
     @staticmethod
     def create_list_of_cells() -> List[Cell]:
