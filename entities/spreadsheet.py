@@ -70,6 +70,7 @@ class SpreadsheetController:
         @raise BadCommandException: Raises if the command the user has input is not valid.
         @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name or the file did not exist.
         """
+        # DOES NOT WORK WITH SEVERAL LINES
         def read_command_from_a_file(path_name: str):
             try:
                 with open(path_name, "r") as file:
@@ -80,7 +81,7 @@ class SpreadsheetController:
 
         command_splitted = command.split(" ")
         try:
-            match command_splitted[0]:
+            match command_splitted[0].upper():
                 case AvailableCommandsEnum.RF:
                     read_command_from_a_file(path_name=command_splitted[1])
                 case AvailableCommandsEnum.C:
@@ -134,7 +135,11 @@ class SpreadsheetController:
         @param new_cell_content: New content of the cell.
         @return: None
         """
-        pass
+        # CHECK IF CELL EXISTS AND OTHER THINGS
+        for cell in self.spreadsheet.list_of_cells:
+            if cell.cell_id == cell_coordinate:
+                cell.content = new_cell_content
+                return None
 
     @staticmethod
     def exit() -> None:
