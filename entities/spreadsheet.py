@@ -2,9 +2,12 @@ import time
 from enum import Enum
 from typing import List
 
+from entities import factory
 from entities.argument import Cell
+from exceptions import exceptions
 from exceptions.exceptions import BadCommandException, SpreadsheetLocationException
 from utils import help_message
+from tabulate import tabulate
 
 
 class AvailableCommandsEnum(str, Enum):
@@ -62,6 +65,16 @@ class SpreadsheetController:
             self.spreadsheet = Spreadsheet()
             self.user_interface = UserInterface()
 
+    @staticmethod
+    def show_spreadsheet():
+        """
+        @summary: Shows the spreadsheet to the user
+        """
+        headers = [''] + [chr(ord('A') + i) for i in range(len(SpreadsheetFactory.create_list_of_cells()))]
+        rows = [[f"{i + 1}"] + [cell.content for cell in row] for i, row in enumerate(SpreadsheetFactory.create_list_of_cells())]
+
+        print(tabulate(rows, headers, tablefmt="grid"))
+
     def read_command(self, command: str) -> Spreadsheet | None:
         """
         @summary: Reads the command sent by the UI and performs the action needed for this command.
@@ -70,12 +83,13 @@ class SpreadsheetController:
         @raise BadCommandException: Raises if the command the user has input is not valid.
         @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name or the file did not exist.
         """
+
         # DOES NOT WORK WITH SEVERAL LINES
         def read_command_from_a_file(path_name: str):
             try:
                 with open(path_name, "r") as file:
                     for line in file:
-                        self.read_command(line)
+                        self.read_command(line.strip())
             except FileNotFoundError:
                 raise SpreadsheetLocationException(message='The file in the route provided does not exist')
 
@@ -85,12 +99,11 @@ class SpreadsheetController:
                 case AvailableCommandsEnum.RF:
                     read_command_from_a_file(path_name=command_splitted[1])
                 case AvailableCommandsEnum.C:
-                    return self.create_spreadsheet()
+                    return factory.create_spreadsheet()
                 case AvailableCommandsEnum.E:
-                    return self.edit_cell(
+                    return factory.edit_cell(
                         cell_coordinate=command_splitted[1],
-                        new_cell_content=command_splitted[2],
-                    )
+                        new_cell_content=command_splitted[2])
                 case AvailableCommandsEnum.L:
                     return self.load_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.S:
@@ -104,20 +117,25 @@ class SpreadsheetController:
                 message="The command input is not valid: not enough arguments were given"
             )
 
-    def create_spreadsheet(self) -> Spreadsheet:
-        """
-        @summary: Creates a spreadsheet using the method create_spreadsheet from SpreadsheetCreation.
-        @return: Spreadsheet.
-        """
-        pass
-
     def load_spreadsheet(self, path_name: str) -> Spreadsheet:
         """
-        @summary: Loads a spreadsheet given its route using the method load_spreadsheet from SpreadsheetLoader.
-        @param path_name: Path where the spreadsheet to be loaded is located.
-        @return: Spreadsheet.
-        """
-        pass
+            @summary: Loads a spreadsheet given its route.
+            @param path_name: Path where the spreadsheet to be loaded is located.
+            @return: Spreadsheet.
+            @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name.
+            """
+
+        try:
+            with open(path_name, 'r') as file:
+                s2v_content = file.read()
+                rows = s2v_content.split('\n')
+                data = [row.split(';') for row in rows]
+                self.spreadsheet = data
+                # assign values to spreadsheet ( data -> cells/spreadsheet on return )
+
+                return self.spreadsheet
+        except Exception as e:
+            raise exceptions.SpreadsheetLocationException(f"Error on locating the file")
 
     def save_spreadsheet(self, path_name: str) -> None:
         """
@@ -127,19 +145,6 @@ class SpreadsheetController:
         @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name or the file did not exist.
         """
         pass
-
-    def edit_cell(self, cell_coordinate: str, new_cell_content: str) -> None:
-        """
-        @summary: Edits the cell given its coordinates and places the new content given using the method edit_cell from CellEdition.
-        @param cell_coordinate: Coordinate of the cell where to modify its content.
-        @param new_cell_content: New content of the cell.
-        @return: None
-        """
-        # CHECK IF CELL EXISTS AND OTHER THINGS
-        for cell in self.spreadsheet.list_of_cells:
-            if cell.cell_id == cell_coordinate:
-                cell.content = new_cell_content
-                return None
 
     @staticmethod
     def exit() -> None:
@@ -178,3 +183,5 @@ class SpreadsheetFactory:
                 list_of_cells.append(cell)
 
         return list_of_cells
+
+
