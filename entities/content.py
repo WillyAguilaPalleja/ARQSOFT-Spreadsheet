@@ -29,7 +29,11 @@ class Content(ABC):
         self.value = value
 
     @abstractmethod
-    def get_value(self) -> Number | Text:
+    def get_value_as_number(self) -> Number | Text:
+        pass
+
+    @abstractmethod
+    def get_value_as_text(self) -> Number | Text:
         pass
 
 
@@ -37,14 +41,17 @@ class NumericalContent(Content):
     def __init__(self, value: Number) -> None:
         super().__init__(value=value)
 
-    def get_value(self) -> Number:
+    def __str__(self) -> str:
+        return str(self.value.get_number_value())
+
+    def get_value_as_number(self) -> Number:
         """
         @summary: Returns the numerical value of the cell.
         @return: Numerical value as a float
         """
         return self.value
 
-    def get_text_from_number(self) -> Text:
+    def get_value_as_text(self) -> Text:
         """
         @summary: Returns the textual representation of the numerical value of
         the cell.
@@ -57,14 +64,17 @@ class TextualContent(Content):
     def __init__(self, value: Text) -> None:
         super().__init__(value=value)
 
-    def get_value(self) -> Text:
+    def __str__(self) -> str:
+        return self.value.text_value
+
+    def get_value_as_text(self) -> Text:
         """
         @summary: Returns the textual value of the cell.
         @return: Textual value as a string
         """
         return self.value
 
-    def get_number_from_text(self) -> Number:
+    def get_value_as_number(self) -> Number:
         """
         @summary: Returns the numerical representation of the textual value
         of the cell. If the cell is empty, returns a 0.0.

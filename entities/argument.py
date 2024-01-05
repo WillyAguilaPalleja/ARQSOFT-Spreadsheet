@@ -1,16 +1,22 @@
 from abc import ABC
 from typing import List
 
+from entities.content import Operand, Content
+
 
 class Argument(ABC):
     def __init__(self) -> None:
         super().__init__()
 
 
-class Cell(Argument):
-    def __init__(self, cell_id: str) -> None:
+class Cell(Argument, Operand):
+    def __init__(self, cell_id: str, content: Content) -> None:
         super().__init__()
         self.cell_id = cell_id
+        self.content = content
+
+    def __repr__(self) -> str:
+        return f"|             {self.content}             |"
 
 
 class CellRange(Argument):

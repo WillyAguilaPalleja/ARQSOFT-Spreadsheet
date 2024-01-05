@@ -3,6 +3,7 @@ from enum import Enum
 from typing import List
 
 from entities.argument import Cell
+from entities.content import TextualContent, Text, Content, NumericalContent, Number
 from exceptions.exceptions import BadCommandException, SpreadsheetLocationException
 from utils import help_message
 
@@ -70,6 +71,7 @@ class SpreadsheetController:
         @raise BadCommandException: Raises if the command the user has input is not valid.
         @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name or the file did not exist.
         """
+
         # DOES NOT WORK WITH SEVERAL LINES
         def read_command_from_a_file(path_name: str):
             try:
@@ -77,7 +79,9 @@ class SpreadsheetController:
                     for line in file:
                         self.read_command(line)
             except FileNotFoundError:
-                raise SpreadsheetLocationException(message='The file in the route provided does not exist')
+                raise SpreadsheetLocationException(
+                    message="The file in the route provided does not exist"
+                )
 
         command_splitted = command.split(" ")
         try:
@@ -92,7 +96,19 @@ class SpreadsheetController:
                         new_cell_content=command_splitted[2],
                     )
                 case AvailableCommandsEnum.L:
-                    return self.load_spreadsheet(path_name=command_splitted[1])
+                    begginning_and_end_of_line = (
+                        "+------------------------------+\n" + "-" * 400 + "+\n"
+                    )
+                    cell_string = begginning_and_end_of_line
+
+                    for index, cell in enumerate(self.spreadsheet.list_of_cells):
+                        cell_string += f"|{str(cell.content)} "
+                        if (index + 1) % 26 == 0:
+                            cell_string += "|\n" + begginning_and_end_of_line
+
+                    print(cell_string)
+
+                    # return self.load_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.S:
                     return self.save_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.Q:
@@ -128,7 +144,7 @@ class SpreadsheetController:
         """
         pass
 
-    def edit_cell(self, cell_coordinate: str, new_cell_content: str) -> None:
+    def edit_cell(self, cell_coordinate: str, new_cell_content: str) -> Content:
         """
         @summary: Edits the cell given its coordinates and places the new content given using the method edit_cell from CellEdition.
         @param cell_coordinate: Coordinate of the cell where to modify its content.
@@ -138,8 +154,16 @@ class SpreadsheetController:
         # CHECK IF CELL EXISTS AND OTHER THINGS
         for cell in self.spreadsheet.list_of_cells:
             if cell.cell_id == cell_coordinate:
-                cell.content = new_cell_content
-                return None
+                try:
+                    new_cell_content = float(new_cell_content)
+                    cell.content = NumericalContent(
+                        value=Number(number_value=new_cell_content)
+                    )
+                except ValueError:
+                    cell.content = TextualContent(
+                        value=Text(text_value=new_cell_content)
+                    )
+                return cell.content
 
     @staticmethod
     def exit() -> None:
@@ -172,9 +196,11 @@ class SpreadsheetFactory:
 
         for row in range(1, rows + 1):
             for col_index in range(columns):
-                col_label = chr(ord('A') + col_index)
-                cell_id = f'{col_label}{row}'
-                cell = Cell(cell_id=cell_id)
+                col_label = chr(ord("A") + col_index)
+                cell_id = f"{col_label}{row}"
+                cell = Cell(
+                    cell_id=cell_id, content=TextualContent(value=Text(text_value=""))
+                )
                 list_of_cells.append(cell)
 
         return list_of_cells
