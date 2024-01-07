@@ -4,6 +4,7 @@ from typing import List
 
 from entities.argument import Cell
 from entities.content import TextualContent, Text, Content, NumericalContent, Number
+from entities.formula import Formula
 from exceptions.exceptions import BadCommandException, SpreadsheetLocationException
 from utils import help_message
 
@@ -110,14 +111,22 @@ class SpreadsheetController:
 
                     # return self.load_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.S:
-                    return self.save_spreadsheet(path_name=command_splitted[1])
+                    formula = Formula(
+                        formula_content=Text(text_value="1+6"),
+                        cells_in_formula=[],
+                        operators_in_formula=[],
+                        operands_in_formula=[],
+                    )
+                    return formula.get_formula_result()
+                    # return self.save_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.Q:
                     return self.exit()
                 case _:
                     raise BadCommandException()
-        except IndexError:
+        except IndexError as e:
             raise BadCommandException(
                 message="The command input is not valid: not enough arguments were given"
+                + str(e)
             )
 
     def create_spreadsheet(self) -> Spreadsheet:
