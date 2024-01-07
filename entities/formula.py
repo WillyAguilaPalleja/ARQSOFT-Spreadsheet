@@ -1,7 +1,7 @@
 from typing import List, Tuple, Any, Union
 import re
 
-from .content import Content, Text, Operand, Cell
+from .content import Content, Text, Operand, Cell, Number
 from .function import SumFunction, MinFunction, AverageFunction, MaxFunction, Function
 from .operator import Operator
 
@@ -19,7 +19,24 @@ class Formula(Content):
         self.operators_in_formula = operators_in_formula
         self.operands_in_formula = operands_in_formula
 
-    def tokenize_formula(self) -> List[Tuple[str | None | List[str | None], Any]]:
+    def replace_numbers_in_functions(self, text_value: str) -> str:
+        pattern = re.compile(r"([A-Za-z][A-Za-z0-9;]*)\(([^)]*)\)")
+
+        def replace_numbers(match: re.Match) -> str:
+            function_name = match.group(1)
+            function_arguments = match.group(2).split(';')
+            function_arguments = [Number(number_value=float(argument.strip())) for argument in function_arguments]
+            print(f"Function arguments: {function_arguments}")
+            print(f"Function name: {function_name}")
+            function_result = float(self.get_function_instance(function_name.upper()).get_result(function_arguments))
+            return str(function_result)
+
+        while re.search(pattern, text_value):
+            text_value = re.sub(pattern=pattern, repl=replace_numbers, string=text_value)
+
+        return text_value
+
+    def tokenize_formula(self) -> List[Tuple[str, str, str]]:
         list_of_tokens = []
         pattern = re.compile(
             r"\s*([A-Za-z][A-Za-z0-9;]*)|(\d+(\.\d*)?)|([+\-*/();])\s*"
@@ -27,16 +44,18 @@ class Formula(Content):
 
         text_value = self.value.get_text_value()
 
+        # Replace numbers inside functions recursively
+        text_value = self.replace_numbers_in_functions(text_value)
+
         for match in pattern.finditer(text_value):
             identifier, number, _, operator = match.groups()
             if identifier and identifier.upper() in {"SUM", "MAX", "MIN", "AVERAGE"}:
-                # Found a function, extract its content
-                function_content = self.extract_function_content(text_value)
-                list_of_tokens.append(("function", identifier.upper(), function_content))
+                list_of_tokens.append(("function", identifier.upper(), '0'))
             elif number:
-                list_of_tokens.append(("number", number, ''))
+                list_of_tokens.append(("number", number, '0'))
             elif operator:
-                list_of_tokens.append(("operator", operator, ''))
+                list_of_tokens.append(("operator", operator, '0'))
+
         print(f"List of tokens: {list_of_tokens}")
         return list_of_tokens
 
@@ -65,16 +84,12 @@ class Formula(Content):
             else:
                 return 0
 
-        # Obtener la lista de tokens utilizando tokenize_formula
         tokens = self.tokenize_formula()
+        print(f"Tokens: {tokens}")
 
         for token_type, value, function_content in tokens:
-            print(f"Token: {token_type, value, function_content}, Stack: {stack}, Output: {output}")
-
             if token_type == "number":
                 output.append(float(value))
-            elif token_type == "function":
-                stack.append(("function", value, function_content))
             elif token_type == "operator":
                 while stack and precedence(stack[-1][1]) >= precedence(value):
                     output.append(stack.pop())
@@ -95,44 +110,49 @@ class Formula(Content):
         stack = []
 
         postfix_expression = self.generate_postfix_expression()
+        print(f"Postfix expression: {postfix_expression}")
 
         for token in postfix_expression:
-            print(f"Token: {token}, Stack: {stack}")
-
             if isinstance(token, float):
                 stack.append(token)
+            elif isinstance(token, str):
+                self.handle_operator(token, stack)
             elif isinstance(token, tuple):
-                if token[0] == "function":
-                    function_name, function_content = token[1], token[2]
-                    function_instance = self.get_function_instance(function_name)
-                    # Handle function call with its arguments
-                    arguments = function_content.split(';')  # Adapt this based on your actual argument separation logic
-                    # Evaluate the function with its arguments
-                    result = function_instance.get_result(arguments)
-                    stack.append(result)
-                elif token[0] == "operator":
-                    if token[1] == '+':
-                        operand2 = stack.pop()
-                        operand1 = stack.pop()
-                        stack.append(operand1 + operand2)
-                    elif token[1] == '-':
-                        operand2 = stack.pop()
-                        operand1 = stack.pop()
-                        stack.append(operand1 - operand2)
-                    elif token[1] == '*':
-                        operand2 = stack.pop()
-                        operand1 = stack.pop()
-                        stack.append(operand1 * operand2)
-                    elif token[1] == '/':
-                        operand2 = stack.pop()
-                        operand1 = stack.pop()
-                        stack.append(operand1 / operand2)
-            else:
-                raise ValueError(f"Unexpected token: {token}")
-
-        print(f"Final Stack: {stack}")
+                type, operator = token
+                self.handle_operator(operator, stack)
 
         return stack[0] if stack else None
+
+    def parse_function_arguments(self, function_content: str) -> List[Number]:
+        # Implement logic to parse function arguments
+        # Here, I'm assuming arguments are separated by ';'
+        argument_values = function_content.split(';')
+
+        # Special case for MIN and MAX functions
+        if argument_values and ',' in argument_values[0]:
+            # Handle MIN and MAX with multiple arguments
+            return [Number(number_value=float(arg)) for arg in argument_values[0].split(',')]
+        else:
+            # Handle other functions with a single list of arguments
+            return [Number(number_value=float(value)) for value in argument_values]
+
+    def handle_operator(self, operator: str, stack: List[Any]):
+        if operator == '+':
+            operand2 = stack.pop()
+            operand1 = stack.pop()
+            stack.append(operand1 + operand2)
+        elif operator == '-':
+            operand2 = stack.pop()
+            operand1 = stack.pop()
+            stack.append(operand1 - operand2)
+        elif operator == '*':
+            operand2 = stack.pop()
+            operand1 = stack.pop()
+            stack.append(operand1 * operand2)
+        elif operator == '/':
+            operand2 = stack.pop()
+            operand1 = stack.pop()
+            stack.append(operand1 / operand2)
 
     def get_function_instance(self, function_name: str) -> Function:
         function_class = {
