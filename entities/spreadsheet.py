@@ -2,8 +2,14 @@ import time
 from enum import Enum
 from typing import List
 
-from entities.argument import Cell
-from entities.content import TextualContent, Text, Content, NumericalContent, Number
+from entities.content import (
+    TextualContent,
+    Text,
+    Content,
+    NumericalContent,
+    Number,
+    Cell,
+)
 from entities.formula import Formula
 from exceptions.exceptions import BadCommandException, SpreadsheetLocationException
 from utils import help_message
@@ -112,7 +118,7 @@ class SpreadsheetController:
                     # return self.load_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.S:
                     formula = Formula(
-                        formula_content=Text(text_value="1+6"),
+                        formula_content=Text(text_value="MAX(4;122;9)"),
                         cells_in_formula=[],
                         operators_in_formula=[],
                         operands_in_formula=[],

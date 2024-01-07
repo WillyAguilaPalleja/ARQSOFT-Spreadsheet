@@ -1,4 +1,4 @@
-from abc import ABC
+"""from abc import ABC
 from typing import List
 
 from entities.content import Operand, Content
@@ -24,4 +24,4 @@ class CellRange(Argument):
         super().__init__()
         self.cells_in_range = cells_in_range
         self.first_cell_id = self.cells_in_range[0].cell_id
-        self.last_cell_id = self.cells_in_range[-1].cell_id
+        self.last_cell_id = self.cells_in_range[-1].cell_id"""

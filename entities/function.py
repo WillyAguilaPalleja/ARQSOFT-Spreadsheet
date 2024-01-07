@@ -1,12 +1,14 @@
 from abc import ABC, abstractmethod
 from typing import List
-from .argument import Argument, Cell, CellRange
-from .content import Operand
+from .content import Operand, Argument, Cell, CellRange
 
 
 class FunctionABC(ABC):
+    def __init__(self) -> None:
+        super().__init__()
+
     @abstractmethod
-    def get_result(*args: Argument) -> float:
+    def get_result(self, *args: Argument) -> float:
         pass
 
     @classmethod
@@ -15,34 +17,26 @@ class FunctionABC(ABC):
         pass
 
 
-class Function(FunctionABC, Argument):
+class Function(FunctionABC):
     def __init__(self, operands: List[Operand]) -> None:
         super().__init__()
         self.operands = operands
 
-    def get_result(*args: Argument) -> float:
-        pass
-
     @classmethod
     def get_num_operands(cls) -> int:
-        return len(cls.__annotations__["operands"].__args__)
+        if hasattr(cls, "operands"):
+            return len(cls.operands)
+        return 0
 
 
 class SumFunction(Function):
-    def __init__(self, *operands: Operand) -> None:
+    def __init__(self, operands: List[Operand]) -> None:
         super().__init__(operands=operands)
 
     def get_result(self, *args: Argument) -> float:
         return sum(
-            float(arg.get_value_as_number())
-            if isinstance(arg, (Cell, CellRange))
-            else arg.get_value_as_number()
-            for arg in args
+            float(arg) if isinstance(arg, (Cell, CellRange)) else arg for arg in args
         )
-
-    @classmethod
-    def get_num_operands(cls) -> int:
-        return len(cls.__annotations__["operands"].__args__)
 
 
 class MinFunction(Function):
@@ -54,10 +48,6 @@ class MinFunction(Function):
             float(arg) if isinstance(arg, (Cell, CellRange)) else arg for arg in args
         )
 
-    @classmethod
-    def get_num_operands(cls) -> int:
-        return len(cls.__annotations__["operands"].__args__)
-
 
 class MaxFunction(Function):
     def __init__(self, operands: List[Operand]) -> None:
@@ -68,10 +58,6 @@ class MaxFunction(Function):
             float(arg) if isinstance(arg, (Cell, CellRange)) else arg for arg in args
         )
 
-    @classmethod
-    def get_num_operands(cls) -> int:
-        return len(cls.__annotations__["operands"].__args__)
-
 
 class AverageFunction(Function):
     def __init__(self, operands: List[Operand]) -> None:
@@ -81,8 +67,9 @@ class AverageFunction(Function):
         args_values = [
             float(arg) if isinstance(arg, (Cell, CellRange)) else arg for arg in args
         ]
-        return sum(args_values) / len(args_values)
 
-    @classmethod
-    def get_num_operands(cls) -> int:
-        return len(cls.__annotations__["operands"].__args__)
+        # Descomentar la siguiente línea si se desea manejar el caso de AVERAGE sin argumentos
+        # if not args_values:
+        #     raise ValueError("AVERAGE function requires at least one argument")
+
+        return sum(args_values) / len(args_values)

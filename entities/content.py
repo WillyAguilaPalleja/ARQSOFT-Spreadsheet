@@ -1,4 +1,10 @@
 from abc import ABC, abstractmethod
+from typing import List
+
+
+class Argument(ABC):
+    def __init__(self) -> None:
+        super().__init__()
 
 
 class Operand(ABC):
@@ -6,9 +12,10 @@ class Operand(ABC):
         super().__init__()
 
 
-class Number(Operand):
+class Number(Operand, Argument):
     def __init__(self, number_value: float) -> None:
-        super().__init__()
+        Operand.__init__(self)
+        Argument.__init__(self)
         self.number_value = number_value
 
     def get_number_value(self) -> float:
@@ -37,7 +44,7 @@ class Content(ABC):
         pass
 
 
-class NumericalContent(Content):
+class NumericalContent(Content, Argument):
     def __init__(self, value: Number) -> None:
         super().__init__(value=value)
 
@@ -82,3 +89,21 @@ class TextualContent(Content):
         @raises NumericalRepresentationException: Raises if the value can not be converted to float (e.g. the value "Hello world").
         """
         return Number(number_value=float(self.value.get_text_value()))
+
+
+class Cell(Argument, Operand):
+    def __init__(self, cell_id: str, content: Content) -> None:
+        super().__init__()
+        self.cell_id = cell_id
+        self.content = content
+
+    def __repr__(self) -> str:
+        return f"|             {self.content}             |"
+
+
+class CellRange(Argument):
+    def __init__(self, cells_in_range: List[Cell]) -> None:
+        super().__init__()
+        self.cells_in_range = cells_in_range
+        self.first_cell_id = self.cells_in_range[0].cell_id
+        self.last_cell_id = self.cells_in_range[-1].cell_id
