@@ -22,6 +22,10 @@ class Function(FunctionABC):
         super().__init__()
         self.operands = operands
 
+    @abstractmethod
+    def get_result(self, arguments: List[Argument]) -> float:
+        pass
+
     @classmethod
     def get_num_operands(cls) -> int:
         if hasattr(cls, "operands"):
@@ -33,9 +37,9 @@ class SumFunction(Function):
     def __init__(self, operands: List[Operand]) -> None:
         super().__init__(operands=operands)
 
-    def get_result(self, *args: Argument) -> float:
+    def get_result(self, arguments: List[Argument]) -> float:
         return sum(
-            float(arg) if isinstance(arg, (Cell, CellRange)) else arg for arg in args
+            float(arg) if isinstance(arg, (Cell, CellRange)) else float(arg) for arg in arguments
         )
 
 
@@ -43,9 +47,9 @@ class MinFunction(Function):
     def __init__(self, operands: List[Operand]) -> None:
         super().__init__(operands=operands)
 
-    def get_result(self, *args: Argument) -> float:
+    def get_result(self, arguments: List[Argument]) -> float:
         return min(
-            float(arg) if isinstance(arg, (Cell, CellRange)) else arg for arg in args
+            float(arg) if isinstance(arg, (Cell, CellRange)) else float(arg) for arg in arguments
         )
 
 
@@ -53,9 +57,9 @@ class MaxFunction(Function):
     def __init__(self, operands: List[Operand]) -> None:
         super().__init__(operands=operands)
 
-    def get_result(self, *args: Argument) -> float:
+    def get_result(self, arguments: List[Argument]) -> float:
         return max(
-            float(arg) if isinstance(arg, (Cell, CellRange)) else arg for arg in args
+            float(arg) if isinstance(arg, (Cell, CellRange)) else float(arg) for arg in arguments
         )
 
 
@@ -63,13 +67,9 @@ class AverageFunction(Function):
     def __init__(self, operands: List[Operand]) -> None:
         super().__init__(operands=operands)
 
-    def get_result(self, *args: Argument) -> float:
+    def get_result(self, arguments: List[Argument]) -> float:
         args_values = [
-            float(arg) if isinstance(arg, (Cell, CellRange)) else arg for arg in args
+            float(arg) if isinstance(arg, (Cell, CellRange)) else float(arg) for arg in arguments
         ]
-
-        # Descomentar la siguiente línea si se desea manejar el caso de AVERAGE sin argumentos
-        # if not args_values:
-        #     raise ValueError("AVERAGE function requires at least one argument")
 
         return sum(args_values) / len(args_values)

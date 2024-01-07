@@ -118,7 +118,7 @@ class SpreadsheetController:
                     # return self.load_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.S:
                     formula = Formula(
-                        formula_content=Text(text_value="MAX(4;122;9)"),
+                        formula_content=Text(text_value="min(4;6;7;12)"),
                         cells_in_formula=[],
                         operators_in_formula=[],
                         operands_in_formula=[],

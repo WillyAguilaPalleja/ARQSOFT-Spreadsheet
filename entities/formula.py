@@ -26,21 +26,32 @@ class Formula(Content):
         )
 
         text_value = self.value.get_text_value()
-        print(f"Text value: {text_value}")
 
         for match in pattern.finditer(text_value):
             identifier, number, _, operator = match.groups()
             if identifier and identifier.upper() in {"SUM", "MAX", "MIN", "AVERAGE"}:
-                print(identifier)  # -> Not entering with AVERAGE
-                list_of_tokens.append(("function", identifier.upper()))
+                # Found a function, extract its content
+                function_content = self.extract_function_content(text_value)
+                list_of_tokens.append(("function", identifier.upper(), function_content))
             elif number:
-                list_of_tokens.append(("number", number))
+                list_of_tokens.append(("number", number, ''))
             elif operator:
-                list_of_tokens.append(("operator", operator))
+                list_of_tokens.append(("operator", operator, ''))
         print(f"List of tokens: {list_of_tokens}")
         return list_of_tokens
 
-    def generate_postfix_expression(self) -> List[Union[str, float]]:
+    def extract_function_content(self, text_value: str) -> str:
+        # Implement logic to extract the content of the function
+        # You can use regular expressions or any other method
+        # Here, I'm providing a simple example assuming arguments are separated by ';'
+        start_index = text_value.find("(")
+        end_index = text_value.find(")")
+        if start_index != -1 and end_index != -1:
+            return text_value[start_index + 1:end_index]
+        else:
+            return "0"
+
+    def generate_postfix_expression(self) -> List[Union[str, float, Tuple[str, str]]]:
         output = []
         stack = []
 
@@ -57,17 +68,21 @@ class Formula(Content):
         # Obtener la lista de tokens utilizando tokenize_formula
         tokens = self.tokenize_formula()
 
-        for token_type, value in tokens:
-            print(f"Token: {token_type, value}, Stack: {stack}")
+        for token_type, value, function_content in tokens:
+            print(f"Token: {token_type, value, function_content}, Stack: {stack}, Output: {output}")
 
             if token_type == "number":
                 output.append(float(value))
             elif token_type == "function":
-                stack.append(value)
-            elif token_type == "operator" and value == "(":
-                stack.append(value)
-            elif token_type == "operator" and value == ")":
-                while stack and stack[-1] != "(":
+                stack.append(("function", value, function_content))
+            elif token_type == "operator":
+                while stack and precedence(stack[-1][1]) >= precedence(value):
+                    output.append(stack.pop())
+                stack.append(("operator", value))
+            elif value == "(":
+                stack.append(("operator", value))
+            elif value == ")":
+                while stack and stack[-1][1] != "(":
                     output.append(stack.pop())
                 stack.pop()  # Pop "("
 
@@ -86,37 +101,47 @@ class Formula(Content):
 
             if isinstance(token, float):
                 stack.append(token)
-            elif isinstance(token, str):
-                if token.upper() in {"SUM", "MAX", "MIN", "AVERAGE"}:
-                    function_name = token.upper()
-                    function_class = {
-                        "SUM": SumFunction,
-                        "MAX": MaxFunction,
-                        "MIN": MinFunction,
-                        "AVERAGE": AverageFunction,
-                    }[function_name]
-                    num_operands = function_class.get_num_operands()
-
-                    # Pop the specified number of operands from the stack
-                    operands = [stack.pop() for _ in range(num_operands)]
-
-                    # If the function allows multiple arguments separated by semicolons,
-                    # split the arguments and push each one onto the stack
-                    if num_operands == 0:
-                        operands = stack[::-1]
-                        stack = []
-
-                    # Reverse order for proper evaluation
-                    operands.reverse()
-
-                    # Instantiate function instance and push result back
-                    function_instance = function_class(operands=operands)
-                    result = function_instance.get_result(*operands)
+            elif isinstance(token, tuple):
+                if token[0] == "function":
+                    function_name, function_content = token[1], token[2]
+                    function_instance = self.get_function_instance(function_name)
+                    # Handle function call with its arguments
+                    arguments = function_content.split(';')  # Adapt this based on your actual argument separation logic
+                    # Evaluate the function with its arguments
+                    result = function_instance.get_result(arguments)
                     stack.append(result)
+                elif token[0] == "operator":
+                    if token[1] == '+':
+                        operand2 = stack.pop()
+                        operand1 = stack.pop()
+                        stack.append(operand1 + operand2)
+                    elif token[1] == '-':
+                        operand2 = stack.pop()
+                        operand1 = stack.pop()
+                        stack.append(operand1 - operand2)
+                    elif token[1] == '*':
+                        operand2 = stack.pop()
+                        operand1 = stack.pop()
+                        stack.append(operand1 * operand2)
+                    elif token[1] == '/':
+                        operand2 = stack.pop()
+                        operand1 = stack.pop()
+                        stack.append(operand1 / operand2)
             else:
                 raise ValueError(f"Unexpected token: {token}")
 
+        print(f"Final Stack: {stack}")
+
         return stack[0] if stack else None
+
+    def get_function_instance(self, function_name: str) -> Function:
+        function_class = {
+            "SUM": SumFunction,
+            "MAX": MaxFunction,
+            "MIN": MinFunction,
+            "AVERAGE": AverageFunction,
+        }[function_name]
+        return function_class(operands=[])
 
     def get_formula_result(self) -> float:
         """
