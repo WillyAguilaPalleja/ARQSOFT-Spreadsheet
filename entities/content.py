@@ -18,6 +18,9 @@ class Number(Operand, Argument):
         Argument.__init__(self)
         self.number_value = number_value
 
+    def __str__(self) -> str:
+        return str(self.number_value)
+
     def get_number_value(self) -> float:
         return self.number_value
 
@@ -27,7 +30,13 @@ class Text:
         self.text_value = text_value
 
     def get_text_value(self) -> str:
-        return self.text_value
+        return self.text_value if self.text_value != '' else '0'
+
+    def get_value_as_number(self) -> Number:
+        text_value = self.value.get_text_value()
+        if text_value == '':
+            return Number(number_value=0.0)
+        return Number(number_value=float(text_value))
 
 
 class Content(ABC):
@@ -88,7 +97,10 @@ class TextualContent(Content):
         @return: Textual representation of the numerical value of the cell.
         @raises NumericalRepresentationException: Raises if the value can not be converted to float (e.g. the value "Hello world").
         """
-        return Number(number_value=float(self.value.get_text_value()))
+        text_value = self.value.get_text_value()
+        if text_value == '':
+            return Number(number_value=0.0)
+        return Number(number_value=float(text_value))
 
 
 class Cell(Argument, Operand):

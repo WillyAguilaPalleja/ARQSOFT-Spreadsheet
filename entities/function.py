@@ -39,7 +39,7 @@ class SumFunction(Function):
 
     def get_result(self, arguments: List[Number]) -> float:
         return sum(
-            float(arg) if isinstance(arg, (Cell, CellRange)) else float(arg.get_number_value()) for arg in arguments
+            float(arg.content.get_value_as_number()) if isinstance(arg, (Cell, CellRange)) else float(arg.get_number_value()) for arg in arguments
         ) if arguments else 0
 
 
@@ -49,7 +49,7 @@ class MinFunction(Function):
 
     def get_result(self, arguments: List[Number]) -> float:
         return min(
-            float(arg) if isinstance(arg, (Cell, CellRange)) else float(arg.get_number_value()) for arg in arguments
+            float(arg.content.get_value_as_number()) if isinstance(arg, (Cell, CellRange)) else float(arg.get_number_value()) for arg in arguments
         ) if arguments else 0
 
 
@@ -59,7 +59,7 @@ class MaxFunction(Function):
 
     def get_result(self, arguments: List[Number]) -> float:
         return max(
-            float(arg) if isinstance(arg, (Cell, CellRange)) else float(arg.get_number_value()) for arg in arguments
+            float(arg.content.get_value_as_number()) if isinstance(arg, (Cell, CellRange)) else float(arg.get_number_value()) for arg in arguments
         ) if arguments else 0
 
 
@@ -69,7 +69,10 @@ class AverageFunction(Function):
 
     def get_result(self, arguments: List[Number]) -> float:
         args_values = [
-            float(arg) if isinstance(arg, (Cell, CellRange)) else float(arg.get_number_value()) for arg in arguments
+            float(arg.content.get_value_as_number())
+            if isinstance(arg, (Cell, CellRange))
+            else float(arg.get_number_value())
+            for arg in arguments
         ]
 
         return sum(args_values) / len(args_values) if arguments else 0

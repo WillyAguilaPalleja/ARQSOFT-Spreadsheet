@@ -1,6 +1,6 @@
 import time
 from enum import Enum
-from typing import List
+from typing import List, re
 
 from entities.content import (
     TextualContent,
@@ -32,6 +32,70 @@ class Spreadsheet:
             Spreadsheet._instance = self
             self.controller = SpreadsheetFactory.create_spreadsheet_controller()
             self.list_of_cells = SpreadsheetFactory.create_list_of_cells()
+            self.dependency_graph = {}
+
+    def build_dependency_graph(self) -> None:
+        # Build a directed acyclic graph (DAG) based on cell dependencies
+        # You may need to adapt this based on your specific implementation
+        for cell in self.list_of_cells:
+            dependencies = self.find_dependencies(cell.content)
+            self.dependency_graph[cell.cell_id] = dependencies
+
+    def find_dependencies(self, content: Content) -> List[str]:
+        # Implement logic to find dependencies for a given content
+        # You may need to adapt this based on your specific implementation
+        dependencies = []
+        if isinstance(content, Formula):
+            # Example: extract cell references from the formula
+            dependencies = re.findall(r"[A-Za-z][A-Za-z0-9]*[0-9]*", content.value.get_text_value())
+        return dependencies
+
+    def evaluate_spreadsheet(self) -> None:
+        # Topologically sort the cells based on dependencies
+        evaluation_order = self.topological_sort()
+
+        # Evaluate cells in the determined order
+        for cell_id in evaluation_order:
+            cell = self.find_cell_by_id(cell_id)
+            if cell and isinstance(cell.content, Formula):
+                cell.content.get_formula_result()
+
+    def topological_sort(self) -> List[str]:
+        # Implement topological sorting algorithm
+        # You may need to adapt this based on your specific implementation
+        visited = set()
+        order = []
+
+        def visit(cell_id: str):
+            if cell_id not in visited:
+                visited.add(cell_id)
+                for dependency in self.dependency_graph.get(cell_id, []):
+                    visit(dependency)
+                order.append(cell_id)
+
+        for cell_id in self.dependency_graph.keys():
+            visit(cell_id)
+
+        return order
+
+    def find_cell_by_id(self, cell_id: str) -> Cell | None:
+        # Implement logic to find a cell by its ID
+        for cell in self.list_of_cells:
+            if cell.cell_id == cell_id:
+                return cell
+
+    def display_spreadsheet(self):
+        beginning_and_end_of_line = (
+                "+------------------------------+\n" + "-" * 30 + "+\n"
+        )
+        cell_string = beginning_and_end_of_line
+
+        for index, cell in enumerate(self.list_of_cells):
+            cell_string += f"| {cell.cell_id}: {str(cell.content)} "
+            if (index + 1) % 26 == 0:
+                cell_string += "|\n" + beginning_and_end_of_line
+
+        print(cell_string)
 
 
 class UserInterface:
@@ -103,27 +167,25 @@ class SpreadsheetController:
                         new_cell_content=command_splitted[2],
                     )
                 case AvailableCommandsEnum.L:
-                    begginning_and_end_of_line = (
-                        "+------------------------------+\n" + "-" * 400 + "+\n"
-                    )
-                    cell_string = begginning_and_end_of_line
+                    self.spreadsheet.evaluate_spreadsheet()
 
-                    for index, cell in enumerate(self.spreadsheet.list_of_cells):
-                        cell_string += f"|{str(cell.content)} "
-                        if (index + 1) % 26 == 0:
-                            cell_string += "|\n" + begginning_and_end_of_line
-
-                    print(cell_string)
+                    # Display the current state of the spreadsheet
+                    self.spreadsheet.display_spreadsheet()
+                    return True
 
                     # return self.load_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.S:
+                    self.spreadsheet.list_of_cells[0].content = Number(4)
+                    self.spreadsheet.list_of_cells[1].content = Number(4)
                     formula = Formula(
-                        formula_content=Text(text_value="min(4;6;7;12)+max(4;6;7;12)+average(4;3)"),
-                        cells_in_formula=[],
+                        formula_content=Text(text_value="=sum(9;9)+A1"),
+                        spreadsheet_cells=self.spreadsheet.list_of_cells,
                         operators_in_formula=[],
                         operands_in_formula=[],
                     )
-                    return formula.get_formula_result()
+                    formula.get_formula_result()
+
+                    return True
                     # return self.save_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.Q:
                     return self.exit()
@@ -169,15 +231,24 @@ class SpreadsheetController:
         # CHECK IF CELL EXISTS AND OTHER THINGS
         for cell in self.spreadsheet.list_of_cells:
             if cell.cell_id == cell_coordinate:
+                if new_cell_content.strip()[0] == "=":
+                    cell.content = Formula(
+                        formula_content=Text(text_value=new_cell_content),
+                        spreadsheet_cells=self.spreadsheet.list_of_cells,
+                        operators_in_formula=[],
+                        operands_in_formula=[],
+                    )
+                    for cell in self.spreadsheet.list_of_cells:
+                        if isinstance(cell.content, Formula):
+                            cell.content.get_formula_result()
+                    return cell.content
                 try:
                     new_cell_content = float(new_cell_content)
-                    cell.content = NumericalContent(
-                        value=Number(number_value=new_cell_content)
-                    )
+                    cell.content = Number(number_value=new_cell_content)
+
                 except ValueError:
-                    cell.content = TextualContent(
-                        value=Text(text_value=new_cell_content)
-                    )
+                    cell.content = Text(text_value=new_cell_content)
+                print(type(cell.content))
                 return cell.content
 
     @staticmethod

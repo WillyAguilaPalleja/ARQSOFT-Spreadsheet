@@ -10,24 +10,56 @@ class Formula(Content):
     def __init__(
         self,
         formula_content: Text,
-        cells_in_formula: List[Cell],
+        spreadsheet_cells: List[Cell],
         operators_in_formula: List[Operator],
         operands_in_formula: List[Operand],
     ) -> None:
         super().__init__(value=formula_content)
-        self.cells_in_formula = cells_in_formula
+        self.spreadsheet_cells = spreadsheet_cells
         self.operators_in_formula = operators_in_formula
         self.operands_in_formula = operands_in_formula
+        self.formula_result = None
+
+    def __str__(self) -> str:
+        return str(Number(number_value=self.get_formula_result()))
+
+    def replace_cell_reference(self, match: re.Match) -> str:
+        cell_id = match.group(0).upper()
+        print(f"Cell id: {cell_id}, type: {type(cell_id)}")
+        for cell in self.spreadsheet_cells:
+            if cell.cell_id == cell_id:
+                print(f"Cell content: {cell.content}")
+                if isinstance(cell.content, Formula):
+                    return str(cell.content.get_formula_result() if cell.content.get_formula_result() else 0.0)
+                elif isinstance(cell.content, Number):
+                    return str(cell.content.get_number_value())
+                elif isinstance(cell.content, Text):
+                    return cell.content.get_text_value()
+
+    def replace_cells_reference_in_formula(self, text_value: str) -> str:
+        pattern = re.compile(r"[A-Za-z][A-Za-z0-9]*[0-9]*")
+        while re.search(pattern, text_value):
+            text_value = re.sub(pattern=pattern, repl=self.replace_cell_reference, string=text_value)
+        return text_value
 
     def replace_numbers_in_functions(self, text_value: str) -> str:
         pattern = re.compile(r"([A-Za-z][A-Za-z0-9;]*)\(([^)]*)\)")
 
+        def replace_argument(arg: str) -> str:
+            return self.replace_cell_reference(arg.strip()) \
+                if isinstance(arg, str) and re.match(r"^[A-Za-z](?:[1-9]|[1-9][0-9]|100)$", arg.strip()) \
+                else arg
+
         def replace_numbers(match: re.Match) -> str:
             function_name = match.group(1)
             function_arguments = match.group(2).split(';')
-            function_arguments = [Number(number_value=float(argument.strip())) for argument in function_arguments]
-            print(f"Function arguments: {function_arguments}")
+
+            function_arguments = [replace_argument(arg) for arg in function_arguments]
+            function_arguments = [Number(number_value=float(eval(arg))) for arg in function_arguments]
+
+            print(f"Function arguments: {[argument.get_number_value() for argument in function_arguments]}")
             print(f"Function name: {function_name}")
+
             function_result = float(self.get_function_instance(function_name.upper()).get_result(function_arguments))
             return str(function_result)
 
@@ -43,9 +75,16 @@ class Formula(Content):
         )
 
         text_value = self.value.get_text_value()
+        text_value = text_value[1:]
+
+        #text_value = self.replace_cells_reference_in_formula(text_value)
+        print(f"Text value: {text_value}")
 
         # Replace numbers inside functions recursively
         text_value = self.replace_numbers_in_functions(text_value)
+        print(f"Text value: {text_value}")
+        text_value = self.replace_cells_reference_in_formula(text_value)
+        print(f"Text value: {text_value}")
 
         for match in pattern.finditer(text_value):
             identifier, number, _, operator = match.groups()
@@ -172,7 +211,10 @@ class Formula(Content):
         @raises CircularDependencyException: Raises if there is a circular dependency in the formula.
         @raises ExpressionPostfixEvaluationException: Raises if there is an error evaluating the postfix expression in the formula.
         """
-        print(self.evaluate_postfix())
+        result = self.evaluate_postfix()
+        self.formula_result = result
+        print(f"Formula result: {result}")
+        return result
 
     # Implementing get_value function from superclass and overwriting it to get_formula_result
     get_value_as_number = get_formula_result
