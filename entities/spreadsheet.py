@@ -123,7 +123,7 @@ class UserInterface:
             try:
                 command = input("Enter a command: ")
                 read_command = self.controller.read_command(command)
-                if read_command == "quit":
+                if read_command is False:
                     user_wants_to_quit = True
             except BadCommandException as exception:
                 print(exception.message)
@@ -138,10 +138,10 @@ class SpreadsheetController:
     def __init__(self) -> None:
         if not SpreadsheetController._instance:
             SpreadsheetController._instance = self
-            self.spreadsheet = Spreadsheet()
+            self.spreadsheet = None
             self.user_interface = UserInterface()
 
-    def read_command(self, command: str) -> Spreadsheet | None:
+    def read_command(self, command: str) -> Spreadsheet | bool | None:
         """
         @summary: Reads the command sent by the UI and performs the action needed for this command.
         @param command: Command sent by the UI
@@ -168,11 +168,14 @@ class SpreadsheetController:
                 case AvailableCommandsEnum.C:
                     return self.create_spreadsheet()
                 case AvailableCommandsEnum.E:
-                    self.edit_cell(
-                        cell_coordinate=command_splitted[1],
-                        new_cell_content=command_splitted[2],
-                    )
-                    self.spreadsheet.display_spreadsheet()
+                    try:
+                        self.edit_cell(
+                            cell_coordinate=command_splitted[1],
+                            new_cell_content=command_splitted[2],
+                        )
+                        self.spreadsheet.display_spreadsheet()
+                    except AttributeError:
+                        raise SpreadsheetLocationException(message='You need to load a spreadsheet first')
                 case AvailableCommandsEnum.L:
                     return self.load_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.S:
@@ -181,20 +184,20 @@ class SpreadsheetController:
                     return self.exit()
                 case _:
                     raise BadCommandException()
-        except IndexError as e:
+        except IndexError:
             raise BadCommandException(
                 message="The command input is not valid: not enough arguments were given"
-                + str(e)
             )
         except CircularDependencyException as e:
             print(e.message)
 
-    def create_spreadsheet(self) -> Spreadsheet:
+    def create_spreadsheet(self) -> None:
         """
         @summary: Creates a spreadsheet using the method create_spreadsheet from SpreadsheetCreation.
-        @return: Spreadsheet.
+        @return: None.
         """
-        pass
+        self.spreadsheet = Spreadsheet()
+        self.spreadsheet.display_spreadsheet()
 
     def load_spreadsheet(self, path_name: str) -> Spreadsheet:
         spreadsheet = Spreadsheet()
@@ -310,7 +313,7 @@ class SpreadsheetController:
         # Close the file
         file.close()
 
-    def edit_cell(self, cell_coordinate: str, new_cell_content: str) -> Content:
+    def edit_cell(self, cell_coordinate: str, new_cell_content: str) -> None:
         """
         @summary: Edits the cell given its coordinates and places the new content given using the method edit_cell from CellEdition.
         @param cell_coordinate: Coordinate of the cell where to modify its content.
@@ -335,23 +338,21 @@ class SpreadsheetController:
                         if isinstance(cell.content, Formula):
                             print(cell.content)
                             cell.content.get_formula_result()
-                    return cell.content
                 try:
                     new_cell_content = float(new_cell_content)
                     cell.content = NumericalContent(value=Number(number_value=new_cell_content))
 
                 except ValueError:
                     cell.content = TextualContent(Text(text_value=new_cell_content))
-                print(type(cell.content))
-                return cell.content
 
     @staticmethod
-    def exit() -> None:
+    def exit() -> bool:
         """
         @summary: Close the application.
         """
         print("Closing the application")
         time.sleep(1)
+        return False
 
 
 class SpreadsheetFactory:
