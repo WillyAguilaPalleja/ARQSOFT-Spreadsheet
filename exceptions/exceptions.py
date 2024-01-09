@@ -61,6 +61,15 @@ class SyntaxErrorInFormulaException(Exception):
         self.message = "The formula has a syntax error"
 
 
+class ValueErrorInFormulaException(Exception):
+    """
+    @summary: Exception raised when the formula has a syntax error.
+    """
+
+    def __init__(self) -> None:
+        self.message = "One of the values of the formula is not valid"
+
+
 class CircularDependencyException(Exception):
     """
     @summary: Exception raised when the formula has a circular dependency.

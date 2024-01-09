@@ -1,7 +1,8 @@
+import os
 import re
 import time
 from enum import Enum
-from typing import List, Any
+from typing import List
 
 from entities.content import (
     TextualContent,
@@ -15,7 +16,8 @@ from entities.formula import Formula
 from exceptions.exceptions import (
     BadCommandException,
     SpreadsheetLocationException,
-    CircularDependencyException,
+    CircularDependencyException, SyntaxErrorInFormulaException, TokenizationFormatInFormulaException,
+    ExpressionPostfixEvaluationException, ValueErrorInFormulaException,
 )
 from utils import help_message
 
@@ -37,7 +39,6 @@ class Spreadsheet:
             Spreadsheet._instance = self
             self.controller = SpreadsheetFactory.create_spreadsheet_controller()
             self.list_of_cells = SpreadsheetFactory.create_list_of_cells()
-            self.dependency_graph = {}
 
     def build_dependency_graph(self) -> None:
         # Build a directed acyclic graph (DAG) based on cell dependencies
@@ -86,10 +87,10 @@ class Spreadsheet:
         return order
 
     def find_cell_by_id(self, cell_id: str) -> Cell | None:
-        # Implement logic to find a cell by its ID
         for cell in self.list_of_cells:
             if cell.cell_id == cell_id:
                 return cell
+        return None
 
     def display_spreadsheet(self):
         beginning_and_end_of_line = (
@@ -138,8 +139,8 @@ class SpreadsheetController:
     def __init__(self) -> None:
         if not SpreadsheetController._instance:
             SpreadsheetController._instance = self
-            self.spreadsheet = None
-            self.user_interface = UserInterface()
+            self.spreadsheet: None | Spreadsheet = None
+            self.user_interface: UserInterface = UserInterface()
 
     def read_command(self, command: str) -> Spreadsheet | bool | None:
         """
@@ -154,7 +155,7 @@ class SpreadsheetController:
             try:
                 with open(path_name, "r") as file:
                     for line in file:
-                        self.read_command(line)
+                        self.read_command(line.strip())
             except FileNotFoundError:
                 raise SpreadsheetLocationException(
                     message="The file in the route provided does not exist"
@@ -164,18 +165,15 @@ class SpreadsheetController:
         try:
             match command_splitted[0].upper():
                 case AvailableCommandsEnum.RF:
-                    read_command_from_a_file(path_name=command_splitted[1])
+                    return read_command_from_a_file(path_name=command_splitted[1])
                 case AvailableCommandsEnum.C:
                     return self.create_spreadsheet()
                 case AvailableCommandsEnum.E:
-                    try:
-                        self.edit_cell(
-                            cell_coordinate=command_splitted[1],
-                            new_cell_content=command_splitted[2],
-                        )
-                        self.spreadsheet.display_spreadsheet()
-                    except AttributeError:
-                        raise SpreadsheetLocationException(message='You need to load a spreadsheet first')
+                    self.edit_cell(
+                        cell_coordinate=command_splitted[1],
+                        new_cell_content=' '.join(command_splitted[2:]),
+                    )
+                    return self.spreadsheet.display_spreadsheet()
                 case AvailableCommandsEnum.L:
                     return self.load_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.S:
@@ -188,8 +186,17 @@ class SpreadsheetController:
             raise BadCommandException(
                 message="The command input is not valid: not enough arguments were given"
             )
+        except SyntaxErrorInFormulaException as e:
+            print(e.message)
+        except ValueErrorInFormulaException as e:
+            print(e.message)
+        except TokenizationFormatInFormulaException as e:
+            print(e.message)
+        except ExpressionPostfixEvaluationException as e:
+            print(e.message)
         except CircularDependencyException as e:
             print(e.message)
+
 
     def create_spreadsheet(self) -> None:
         """
@@ -203,13 +210,15 @@ class SpreadsheetController:
         spreadsheet = Spreadsheet()
 
         list_of_cells = [
-            Cell(cell_id=f"{chr(65 + col_index)}{row_index + 1}", content=TextualContent(value=Text(text_value="")))
-            for row_index in range(100) for col_index in range(26)
+            Cell(
+                cell_id=f"{chr(65 + col_index)}{row_index + 1}",
+                content=TextualContent(value=Text(text_value="")),
+            )
+            for row_index in range(100)
+            for col_index in range(26)
         ]
         spreadsheet.list_of_cells = list_of_cells
         self.spreadsheet = spreadsheet
-
-        print(f"Attempting to read from file: {path_name}")
 
         with open(path_name, "r") as file:
             row_index = 0
@@ -217,17 +226,12 @@ class SpreadsheetController:
             for line in file:
                 line = line.strip()
                 line_values = line.split(";")
-                print(f"Line {row_index}: {line_values}")
 
                 for col_index, cell_content in enumerate(line_values[:26]):
-                    print(f"Attempting to parse cell content: {cell_content}")
-
                     parsed_content = self.parse_s2v_content(cell_content, list_of_cells)
 
                     index = row_index * 26 + col_index
                     list_of_cells[index].content = parsed_content
-
-                    print(f"Cell {list_of_cells[index].cell_id}: {parsed_content}")
 
                 row_index += 1
                 if row_index >= 100:
@@ -243,26 +247,26 @@ class SpreadsheetController:
 
     @staticmethod
     def parse_s2v_content(s2v_content: str, list_of_cells: List[Cell]) -> Content:
-        # Remove leading and trailing whitespaces from the content
         s2v_content = s2v_content.strip()
 
-        # Check if the content is a formula (starts with '=')
-        if s2v_content.startswith('='):
-            return Formula(formula_content=Text(text_value=s2v_content.replace(',', ';')), spreadsheet_cells=list_of_cells,
-                           operators_in_formula=[], operands_in_formula=[])
-        # Check if the content is numeric
-        elif s2v_content.replace('.', '', 1).isdigit():
+        if s2v_content.startswith("="):
+            return Formula(
+                formula_content=Text(text_value=s2v_content.replace(",", ";")),
+                spreadsheet_cells=list_of_cells,
+                operators_in_formula=[],
+                operands_in_formula=[],
+            )
+        elif s2v_content.replace(".", "", 1).isdigit():
             return NumericalContent(value=Number(number_value=float(s2v_content)))
-        # If not a formula or numeric, treat it as textual content
         else:
             return TextualContent(value=Text(text_value=s2v_content))
 
     @staticmethod
     def remove_trailing_semicolons(row_list: List[str]):
         i = len(row_list) - 1
-        while i >= 0 and row_list[i] == '':
+        while i >= 0 and row_list[i] == "":
             i -= 1
-        return row_list[:i + 1]
+        return row_list[: i + 1]
 
     def save_spreadsheet(self, path_name: str) -> None:
         """
@@ -271,10 +275,18 @@ class SpreadsheetController:
         @return: None.
         @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name or the file did not exist.
         """
-        # Open the file in write mode to overwrite existing content or create a new file
+        if os.path.exists(path_name):
+            raise SpreadsheetLocationException(
+                message=f"A file with name {path_name} already exists, please pick another one."
+            )
+        elif not self.spreadsheet:
+            raise SpreadsheetLocationException(
+                message="You need to create or load a spreadsheet first"
+            )
+
         with open(path_name, "w") as file:
             for row_index in range(100):
-                row_string = ''
+                row_string = ""
 
                 for col_index in range(26):
                     index = row_index * 26 + col_index
@@ -284,31 +296,33 @@ class SpreadsheetController:
                         if isinstance(cell.content.value, Text):
                             row_string += f"{cell.content.value.get_text_value().replace(';', ', ')};"
                         else:
-                            row_string += f'{cell.content.value.get_number_value()};'
+                            row_string += f"{cell.content.value.get_number_value()};"
 
                     elif isinstance(cell.content, NumericalContent):
                         # Check if it's the first value in the row
-                        if row_string == '':
-                            row_string += f'{cell.content.value.get_number_value()}'
+                        if row_string == "":
+                            row_string += f"{cell.content.value.get_number_value()}"
                         else:
-                            row_string += f';{cell.content.value.get_number_value()}'
+                            row_string += f";{cell.content.value.get_number_value()}"
 
                     elif isinstance(cell.content, TextualContent):
-                        text_value = f'{cell.content.value.get_text_value()}'
-                        if text_value in ['0', '0.0', 'None', '']:
-                            row_string += ';'
+                        text_value = f"{cell.content.value.get_text_value()}"
+                        if text_value in ["0", "0.0", "None", ""]:
+                            row_string += ";"
                         else:
-                            row_string += f'{text_value};'
+                            row_string += f"{text_value};"
 
                 # Remove trailing semicolons from the right
-                row_list = row_string.split(';')
+                row_list = row_string.split(";")
                 row_list = self.remove_trailing_semicolons(row_list)
-                row_string = ';'.join(value if value != '' else '' for value in row_list)
+                row_string = ";".join(
+                    value if value != "" else "" for value in row_list
+                )
 
                 if len(row_list) > 0:
                     file.write(f"{row_string}\n")
                 else:
-                    file.write('\n')
+                    file.write("\n")
 
         # Close the file
         file.close()
@@ -320,12 +334,12 @@ class SpreadsheetController:
         @param new_cell_content: New content of the cell.
         @return: None
         """
+        if not self.spreadsheet:
+            raise SpreadsheetLocationException(
+                message="You need to load a spreadsheet first"
+            )
 
         for cell in self.spreadsheet.list_of_cells:
-            if isinstance(cell.content, Formula):
-                print(f"Formula Content: {cell.content}")
-                print(f"Tokenization: {cell.content.tokenize_formula()}")
-
             if cell.cell_id == cell_coordinate:
                 if new_cell_content.strip()[0] == "=":
                     cell.content = Formula(
@@ -339,8 +353,10 @@ class SpreadsheetController:
                             print(cell.content)
                             cell.content.get_formula_result()
                 try:
-                    new_cell_content = float(new_cell_content)
-                    cell.content = NumericalContent(value=Number(number_value=new_cell_content))
+                    new_cell_content_to_float = float(new_cell_content)
+                    cell.content = NumericalContent(
+                        value=Number(number_value=new_cell_content_to_float)
+                    )
 
                 except ValueError:
                     cell.content = TextualContent(Text(text_value=new_cell_content))

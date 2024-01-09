@@ -1,10 +1,28 @@
+from enum import Enum
 from typing import List, Tuple, Any, Union
 import re
 
-from exceptions.exceptions import CircularDependencyException
-from .content import Content, Text, Operand, Cell, Number, NumericalContent, TextualContent
+from exceptions.exceptions import CircularDependencyException, SyntaxErrorInFormulaException, \
+    TokenizationFormatInFormulaException, ExpressionPostfixEvaluationException, NumericalRepresentationException, \
+    ValueErrorInFormulaException
+from .content import (
+    Content,
+    Text,
+    Operand,
+    Cell,
+    Number,
+    NumericalContent,
+    TextualContent,
+)
 from .function import SumFunction, MinFunction, AverageFunction, MaxFunction, Function
-from .operator import Operator
+from .operator import Operator, SumOperator, SubstractionOperator, MultiplyOperator, DivisionOperator
+
+
+class OperatorEnum(str, Enum):
+    ADD = SumOperator().operator
+    SUBTRACT = SubstractionOperator().operator
+    MULTIPLY = MultiplyOperator().operator
+    DIVIDE = DivisionOperator().operator
 
 
 class Formula(Content):
@@ -26,17 +44,19 @@ class Formula(Content):
 
     def replace_cell_reference(self, match: re.Match) -> str:
         cell_id = match.group(0).upper()
-        for cell in self.spreadsheet_cells:
-            if cell.cell_id == cell_id:
-                if cell.content and isinstance(cell.content, Formula):
-                    return str(cell.content.get_formula_result())
-                elif cell.content and isinstance(cell.content, NumericalContent):
-                    return str(cell.content.get_value_as_number().get_number_value())
-                elif cell.content and isinstance(cell.content, TextualContent):
-                    return cell.content.get_value_as_text().get_text_value()
-                else:
-                    return '0.0'
-        return '0.0'
+        try:
+            for cell in self.spreadsheet_cells:
+                if cell.cell_id == cell_id:
+                    if cell.content and isinstance(cell.content, Formula):
+                        return str(cell.content.get_formula_result())
+                    elif cell.content and isinstance(cell.content, NumericalContent):
+                        return str(cell.content.get_value_as_number().get_number_value())
+                    elif cell.content and isinstance(cell.content, TextualContent):
+                        return str(cell.content.get_value_as_number().get_number_value())
+                    else:
+                        raise SyntaxErrorInFormulaException()
+        except NumericalRepresentationException:
+            raise ValueErrorInFormulaException()
 
     def replace_cells_reference_in_formula(self, text_value: str) -> str:
         pattern = re.compile(r"[A-Za-z][A-Za-z0-9]*[0-9]*")
@@ -51,10 +71,14 @@ class Formula(Content):
 
         def replace_argument(arg: str) -> str:
             return (
-                self.replace_cell_reference(re.search(r"[A-Za-z][A-Za-z0-9]*[0-9]*", arg.strip()))
+                self.replace_cell_reference(
+                    re.search(r"[A-Za-z][A-Za-z0-9]*[0-9]*", arg.strip())
+                )
                 if isinstance(arg, str)
-                   and re.match(r"^[A-Za-z](?:[1-9]|[1-9][0-9]|100)$", arg.strip())
-                else arg if arg != '' else '0.0'
+                and re.match(r"^[A-Za-z](?:[1-9]|[1-9][0-9]|100)$", arg.strip())
+                else arg
+                if arg != ""
+                else "0.0"
             )
 
         def replace_numbers(match: re.Match) -> str:
@@ -63,7 +87,9 @@ class Formula(Content):
 
             function_arguments = [replace_argument(arg) for arg in function_arguments]
             function_arguments = [
-                Number(number_value=float(arg)) if arg != '' else Number(number_value=0.0)
+                Number(number_value=float(arg))
+                if arg != ""
+                else Number(number_value=0.0)
                 for arg in function_arguments
             ]
 
@@ -89,8 +115,10 @@ class Formula(Content):
 
         text_value = self.value.get_text_value()
         text_value = text_value[1:]
-
-        text_value = self.replace_numbers_in_functions(text_value)
+        try:
+            text_value = self.replace_numbers_in_functions(text_value)
+        except KeyError:
+            raise SyntaxErrorInFormulaException()
         text_value = self.replace_cells_reference_in_formula(text_value)
 
         for match in pattern.finditer(text_value):
@@ -100,7 +128,13 @@ class Formula(Content):
             elif number:
                 list_of_tokens.append(("number", number))
             elif operator:
+                if operator not in OperatorEnum.__members__.values():
+                    raise SyntaxErrorInFormulaException()
                 list_of_tokens.append(("operator", operator))
+
+        for token_type, value in list_of_tokens:
+            if token_type not in ["number", "operator", "function"]:
+                raise TokenizationFormatInFormulaException()
 
         return list_of_tokens
 
@@ -111,7 +145,7 @@ class Formula(Content):
         start_index = text_value.find("(")
         end_index = text_value.find(")")
         if start_index != -1 and end_index != -1:
-            return text_value[start_index + 1: end_index]
+            return text_value[start_index + 1 : end_index]
         else:
             return "0"
 
@@ -154,15 +188,18 @@ class Formula(Content):
         stack = []
 
         postfix_expression = self.generate_postfix_expression()
-
-        for token in postfix_expression:
-            if isinstance(token, float):
-                stack.append(token)
-            elif isinstance(token, str):
-                self.handle_operator(token, stack)
-            elif isinstance(token, tuple):
-                _type, operator = token
-                self.handle_operator(operator, stack)
+        try:
+            for token in postfix_expression:
+                if isinstance(token, float):
+                    stack.append(token)
+                elif isinstance(token, str):
+                    self.handle_operator(token, stack)
+                elif isinstance(token, tuple):
+                    _type, operator = token
+                    self.handle_operator(operator, stack)
+        except Exception as e:
+            print(e)
+            raise ExpressionPostfixEvaluationException()
 
         return NumericalContent(value=Number(number_value=stack[0])) if stack else None
 
@@ -182,22 +219,35 @@ class Formula(Content):
             return [Number(number_value=float(value)) for value in argument_values]
 
     def handle_operator(self, operator: str, stack: List[Any]):
-        if operator == "+":
-            operand2 = stack.pop()
-            operand1 = stack.pop()
-            stack.append(operand1 + operand2)
-        elif operator == "-":
-            operand2 = stack.pop()
-            operand1 = stack.pop()
-            stack.append(operand1 - operand2)
-        elif operator == "*":
-            operand2 = stack.pop()
-            operand1 = stack.pop()
-            stack.append(operand1 * operand2)
-        elif operator == "/":
-            operand2 = stack.pop()
-            operand1 = stack.pop()
-            stack.append(operand1 / operand2)
+        operand2 = stack.pop()
+        operand1 = stack.pop()
+
+        if operator == OperatorEnum.ADD:
+            if isinstance(operand1, (int, float)) and isinstance(operand2, (int, float)):
+                stack.append(operand1 + operand2)
+            elif isinstance(operand1, str) and isinstance(operand2, (int, float)):
+                stack.append(str(operand1) + str(operand2))
+            elif isinstance(operand1, (int, float)) and isinstance(operand2, str):
+                stack.append(str(operand1) + str(operand2))
+            elif isinstance(operand1, str) and isinstance(operand2, str):
+                stack.append(str(operand1) + str(operand2))
+            else:
+                raise SyntaxErrorInFormulaException()
+        elif operator == OperatorEnum.SUBTRACT:
+            if isinstance(operand1, (int, float)) and isinstance(operand2, (int, float)):
+                stack.append(operand1 - operand2)
+            else:
+                raise SyntaxErrorInFormulaException()
+        elif operator == OperatorEnum.MULTIPLY:
+            if isinstance(operand1, (int, float)) and isinstance(operand2, (int, float)):
+                stack.append(operand1 * operand2)
+            else:
+                raise SyntaxErrorInFormulaException()
+        elif operator == OperatorEnum.DIVIDE:
+            if isinstance(operand1, (int, float)) and isinstance(operand2, (int, float)):
+                stack.append(operand1 / operand2)
+            else:
+                raise SyntaxErrorInFormulaException()
 
     def get_function_instance(self, function_name: str) -> Function:
         function_class = {
@@ -214,6 +264,7 @@ class Formula(Content):
         @return: Result of the formula as a float.
         @raises TokenizationFormatInFormulaException: Raises if the format of any token is incorrect.
         @raises SyntaxErrorInFormulaException: Raises if there is a syntax error in the formula.
+        @raises ValueErrorInFormulaException: Raises if there is a value error in the formula.
         @raises CircularDependencyException: Raises if there is a circular dependency in the formula.
         @raises ExpressionPostfixEvaluationException: Raises if there is an error evaluating the postfix expression in the formula.
         """
@@ -221,6 +272,14 @@ class Formula(Content):
             result = self.evaluate_postfix()
             self.formula_result = result
             return result
+        except SyntaxErrorInFormulaException as e:
+            raise e
+        except TokenizationFormatInFormulaException as e:
+            raise e
+        except ExpressionPostfixEvaluationException as e:
+            raise e
+        except ValueErrorInFormulaException as e:
+            raise e
         except RecursionError:
             raise CircularDependencyException()
 

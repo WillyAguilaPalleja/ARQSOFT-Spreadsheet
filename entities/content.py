@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List
 
+from exceptions.exceptions import NumericalRepresentationException
+
 
 class Argument(ABC):
     def __init__(self) -> None:
@@ -100,7 +102,11 @@ class TextualContent(Content):
         text_value = self.value.get_text_value()
         if text_value == "":
             return Number(number_value=0.0)
-        return Number(number_value=float(text_value))
+        try:
+            textual_value_to_numerical_value = float(text_value)
+        except ValueError:
+            raise NumericalRepresentationException()
+        return Number(number_value=float(textual_value_to_numerical_value))
 
 
 class Cell(Argument, Operand):
@@ -108,9 +114,6 @@ class Cell(Argument, Operand):
         super().__init__()
         self.cell_id = cell_id
         self.content = content
-
-    def __repr__(self) -> str:
-        return f"|             {self.content}             |"
 
 
 class CellRange(Argument):

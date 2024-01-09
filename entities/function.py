@@ -8,7 +8,7 @@ class FunctionABC(ABC):
         super().__init__()
 
     @abstractmethod
-    def get_result(self, *args: Argument) -> float:
+    def get_result(self, arguments: Argument) -> float:
         pass
 
     @classmethod
