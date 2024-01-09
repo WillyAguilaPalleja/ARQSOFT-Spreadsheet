@@ -3,6 +3,16 @@ from typing import List
 from .content import Operand, Argument, Cell, CellRange, Number
 
 
+def flatten(list_to_flatten: List) -> List:
+    result = []
+    for item in list_to_flatten:
+        if isinstance(item, list):
+            result.extend(flatten(item))
+        else:
+            result.append(item)
+    return result
+
+
 class FunctionABC(ABC):
     def __init__(self) -> None:
         super().__init__()
@@ -38,14 +48,15 @@ class SumFunction(Function):
         super().__init__(operands=operands)
 
     def get_result(self, arguments: List[Number]) -> float:
+        arguments_flattened = flatten(arguments)
         return (
             sum(
                 float(arg.content.get_value_as_number())
                 if isinstance(arg, (Cell, CellRange))
-                else float(arg.get_number_value())
-                for arg in arguments
+                else float(arg)
+                for arg in arguments_flattened
             )
-            if arguments
+            if arguments_flattened
             else 0
         )
 
@@ -55,14 +66,15 @@ class MinFunction(Function):
         super().__init__(operands=operands)
 
     def get_result(self, arguments: List[Number]) -> float:
+        arguments_flattened = flatten(arguments)
         return (
             min(
                 float(arg.content.get_value_as_number())
                 if isinstance(arg, (Cell, CellRange))
-                else float(arg.get_value_as_number())
-                for arg in arguments
+                else float(arg)
+                for arg in arguments_flattened
             )
-            if arguments
+            if arguments_flattened
             else 0
         )
 
@@ -72,14 +84,15 @@ class MaxFunction(Function):
         super().__init__(operands=operands)
 
     def get_result(self, arguments: List[Number]) -> float:
+        arguments_flattened = flatten(arguments)
         return (
             max(
                 float(arg.content.get_value_as_number())
                 if isinstance(arg, (Cell, CellRange))
-                else float(arg.get_number_value())
-                for arg in arguments
+                else float(arg)
+                for arg in arguments_flattened
             )
-            if arguments
+            if arguments_flattened
             else 0
         )
 
@@ -89,11 +102,12 @@ class AverageFunction(Function):
         super().__init__(operands=operands)
 
     def get_result(self, arguments: List[Number]) -> float:
+        arguments_flattened = flatten(arguments)
         args_values = [
             float(arg.content.get_value_as_number())
             if isinstance(arg, (Cell, CellRange))
-            else float(arg.get_number_value())
+            else float(arg)
             for arg in arguments
         ]
 
-        return sum(args_values) / len(args_values) if arguments else 0
+        return sum(args_values) / len(args_values) if arguments_flattened else 0

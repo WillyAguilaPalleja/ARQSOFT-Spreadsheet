@@ -12,7 +12,7 @@ from .content import (
     Cell,
     Number,
     NumericalContent,
-    TextualContent,
+    TextualContent, CellRange,
 )
 from .function import SumFunction, MinFunction, AverageFunction, MaxFunction, Function
 from .operator import Operator, SumOperator, SubstractionOperator, MultiplyOperator, DivisionOperator
@@ -69,17 +69,50 @@ class Formula(Content):
     def replace_numbers_in_functions(self, text_value: str) -> str:
         pattern = re.compile(r"([A-Za-z][A-Za-z0-9;]*)\(([^)]*)\)")
 
-        def replace_argument(arg: str) -> str:
-            return (
-                self.replace_cell_reference(
-                    re.search(r"[A-Za-z][A-Za-z0-9]*[0-9]*", arg.strip())
+        def get_cells_in_range(start_cell, end_cell, spreadsheet_cells):
+            start_col, start_row = start_cell[0], int(start_cell[1:])
+            end_col, end_row = end_cell[0], int(end_cell[1:])
+
+            cells_in_range = []
+            for cell in self.spreadsheet_cells:
+                if start_col <= cell.cell_id[0] <= end_col and start_row <= int(cell.cell_id[1:]) <= end_row:
+                    cells_in_range.append(cell)
+
+            print([cell.cell_id for cell in cells_in_range])
+            return cells_in_range
+
+        def replace_argument(arg: str) -> List[float] | str:
+            # Handle range arguments
+            if ":" in arg:
+                start_cell, end_cell = arg.split(":")
+
+                # Get cells in the range
+                cell_range = get_cells_in_range(start_cell, end_cell, self.spreadsheet_cells)
+
+                # Create a CellRange object
+                cell_range_obj = CellRange(cells_in_range=cell_range)
+
+
+                values = []
+                for cell in cell_range_obj.cells_in_range:
+                    if isinstance(cell.content, Formula):
+                        values.append(cell.content.get_formula_result())
+                    elif isinstance(cell.content, TextualContent):
+                        values.append(cell.content.get_value_as_number().get_number_value())
+                    elif isinstance(cell.content, NumericalContent):
+                        values.append(cell.content.get_value_as_number().get_number_value())
+                    else:
+                        values.append(0.0)
+                return values
+
+            else:  # Handle regular single cell reference
+                return (
+                    self.replace_cells_reference_in_formula(arg.strip())
+                    if re.match(r"^[A-Za-z](?:[1-9]|[1-9][0-9]|100)$", arg.strip())
+                    else arg
+                    if arg != ""
+                    else "0.0"
                 )
-                if isinstance(arg, str)
-                and re.match(r"^[A-Za-z](?:[1-9]|[1-9][0-9]|100)$", arg.strip())
-                else arg
-                if arg != ""
-                else "0.0"
-            )
 
         def replace_numbers(match: re.Match) -> str:
             function_name = match.group(1)
@@ -87,17 +120,14 @@ class Formula(Content):
 
             function_arguments = [replace_argument(arg) for arg in function_arguments]
             function_arguments = [
-                Number(number_value=float(arg))
-                if arg != ""
-                else Number(number_value=0.0)
-                for arg in function_arguments
+                arg if arg != "" else Number(number_value=0.0) for arg in function_arguments
             ]
+            print(function_arguments)
 
-            function_result = float(
-                self.get_function_instance(function_name.upper()).get_result(
-                    function_arguments
-                )
+            function_result = self.get_function_instance(function_name.upper()).get_result(
+                function_arguments
             )
+
             return str(function_result)
 
         while re.search(pattern, text_value):
@@ -223,31 +253,18 @@ class Formula(Content):
         operand1 = stack.pop()
 
         if operator == OperatorEnum.ADD:
-            if isinstance(operand1, (int, float)) and isinstance(operand2, (int, float)):
+            if isinstance(operand1, str) and isinstance(operand2, str):
                 stack.append(operand1 + operand2)
-            elif isinstance(operand1, str) and isinstance(operand2, (int, float)):
-                stack.append(str(operand1) + str(operand2))
-            elif isinstance(operand1, (int, float)) and isinstance(operand2, str):
-                stack.append(str(operand1) + str(operand2))
-            elif isinstance(operand1, str) and isinstance(operand2, str):
-                stack.append(str(operand1) + str(operand2))
             else:
-                raise SyntaxErrorInFormulaException()
+                stack.append(operand1 + operand2)
         elif operator == OperatorEnum.SUBTRACT:
-            if isinstance(operand1, (int, float)) and isinstance(operand2, (int, float)):
-                stack.append(operand1 - operand2)
-            else:
-                raise SyntaxErrorInFormulaException()
+            stack.append(operand1 - operand2)
         elif operator == OperatorEnum.MULTIPLY:
-            if isinstance(operand1, (int, float)) and isinstance(operand2, (int, float)):
-                stack.append(operand1 * operand2)
-            else:
-                raise SyntaxErrorInFormulaException()
+            stack.append(operand1 * operand2)
         elif operator == OperatorEnum.DIVIDE:
-            if isinstance(operand1, (int, float)) and isinstance(operand2, (int, float)):
-                stack.append(operand1 / operand2)
-            else:
-                raise SyntaxErrorInFormulaException()
+            stack.append(operand1 / operand2)
+        else:
+            raise SyntaxErrorInFormulaException()
 
     def get_function_instance(self, function_name: str) -> Function:
         function_class = {

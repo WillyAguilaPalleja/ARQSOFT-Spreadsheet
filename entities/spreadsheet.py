@@ -16,8 +16,11 @@ from entities.formula import Formula
 from exceptions.exceptions import (
     BadCommandException,
     SpreadsheetLocationException,
-    CircularDependencyException, SyntaxErrorInFormulaException, TokenizationFormatInFormulaException,
-    ExpressionPostfixEvaluationException, ValueErrorInFormulaException,
+    CircularDependencyException,
+    SyntaxErrorInFormulaException,
+    TokenizationFormatInFormulaException,
+    ExpressionPostfixEvaluationException,
+    ValueErrorInFormulaException,
 )
 from utils import help_message
 
@@ -94,7 +97,7 @@ class Spreadsheet:
 
     def display_spreadsheet(self):
         beginning_and_end_of_line = (
-            "+------------------------------+\n" + "-" * 30 + "+\n"
+            "+------------------------------+\n" + "-" * 400 + "+\n"
         )
         cell_string = beginning_and_end_of_line
 
@@ -171,7 +174,7 @@ class SpreadsheetController:
                 case AvailableCommandsEnum.E:
                     self.edit_cell(
                         cell_coordinate=command_splitted[1],
-                        new_cell_content=' '.join(command_splitted[2:]),
+                        new_cell_content=" ".join(command_splitted[2:]),
                     )
                     return self.spreadsheet.display_spreadsheet()
                 case AvailableCommandsEnum.L:
@@ -197,7 +200,6 @@ class SpreadsheetController:
         except CircularDependencyException as e:
             print(e.message)
 
-
     def create_spreadsheet(self) -> None:
         """
         @summary: Creates a spreadsheet using the method create_spreadsheet from SpreadsheetCreation.
@@ -208,7 +210,10 @@ class SpreadsheetController:
 
     def load_spreadsheet(self, path_name: str) -> Spreadsheet:
         spreadsheet = Spreadsheet()
-
+        if path_name.split(".")[-1] != "s2v":
+            raise SpreadsheetLocationException(
+                message="The file in the route provided is not a .s2v file"
+            )
         list_of_cells = [
             Cell(
                 cell_id=f"{chr(65 + col_index)}{row_index + 1}",
@@ -275,6 +280,10 @@ class SpreadsheetController:
         @return: None.
         @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name or the file did not exist.
         """
+        if path_name.split(".")[-1] != "s2v":
+            raise SpreadsheetLocationException(
+                message="The file in the route provided is not a .s2v file"
+            )
         if os.path.exists(path_name):
             raise SpreadsheetLocationException(
                 message=f"A file with name {path_name} already exists, please pick another one."

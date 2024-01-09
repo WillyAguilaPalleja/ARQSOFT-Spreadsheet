@@ -62,6 +62,18 @@ class NumericalContent(Content, Argument):
     def __str__(self) -> str:
         return str(self.value.get_number_value())
 
+    def __float__(self):
+        return self.value.get_number_value()
+
+    def __gt__(self, other):
+        return self.value.get_number_value() > other
+
+    def __lt__(self, other):
+        return self.value.get_number_value() < other
+
+    def __repr__(self) -> str:
+        return str(self.value.number_value)
+
     def get_value_as_number(self) -> Number:
         """
         @summary: Returns the numerical value of the cell.
@@ -81,6 +93,9 @@ class NumericalContent(Content, Argument):
 class TextualContent(Content):
     def __init__(self, value: Text) -> None:
         super().__init__(value=value)
+
+    def __repr__(self) -> str:
+        return self.value.text_value
 
     def __str__(self) -> str:
         return self.value.text_value
@@ -120,5 +135,5 @@ class CellRange(Argument):
     def __init__(self, cells_in_range: List[Cell]) -> None:
         super().__init__()
         self.cells_in_range = cells_in_range
-        self.first_cell_id = self.cells_in_range[0].cell_id
-        self.last_cell_id = self.cells_in_range[-1].cell_id
+        self.first_cell_id = self.cells_in_range[0].cell_id if self.cells_in_range else ""
+        self.last_cell_id = self.cells_in_range[-1].cell_id if self.cells_in_range else ""
