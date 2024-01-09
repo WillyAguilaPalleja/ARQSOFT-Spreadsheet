@@ -38,9 +38,16 @@ class SumFunction(Function):
         super().__init__(operands=operands)
 
     def get_result(self, arguments: List[Number]) -> float:
-        return sum(
-            float(arg.content.get_value_as_number()) if isinstance(arg, (Cell, CellRange)) else float(arg.get_number_value()) for arg in arguments
-        ) if arguments else 0
+        return (
+            sum(
+                float(arg.content.get_value_as_number())
+                if isinstance(arg, (Cell, CellRange))
+                else float(arg.get_number_value())
+                for arg in arguments
+            )
+            if arguments
+            else 0
+        )
 
 
 class MinFunction(Function):
@@ -48,9 +55,16 @@ class MinFunction(Function):
         super().__init__(operands=operands)
 
     def get_result(self, arguments: List[Number]) -> float:
-        return min(
-            float(arg.content.get_value_as_number()) if isinstance(arg, (Cell, CellRange)) else float(arg.get_number_value()) for arg in arguments
-        ) if arguments else 0
+        return (
+            min(
+                float(arg.content.get_value_as_number())
+                if isinstance(arg, (Cell, CellRange))
+                else float(arg.get_value_as_number())
+                for arg in arguments
+            )
+            if arguments
+            else 0
+        )
 
 
 class MaxFunction(Function):
@@ -58,9 +72,16 @@ class MaxFunction(Function):
         super().__init__(operands=operands)
 
     def get_result(self, arguments: List[Number]) -> float:
-        return max(
-            float(arg.content.get_value_as_number()) if isinstance(arg, (Cell, CellRange)) else float(arg.get_number_value()) for arg in arguments
-        ) if arguments else 0
+        return (
+            max(
+                float(arg.content.get_value_as_number())
+                if isinstance(arg, (Cell, CellRange))
+                else float(arg.get_number_value())
+                for arg in arguments
+            )
+            if arguments
+            else 0
+        )
 
 
 class AverageFunction(Function):

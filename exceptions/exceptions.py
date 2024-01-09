@@ -66,8 +66,13 @@ class CircularDependencyException(Exception):
     @summary: Exception raised when the formula has a circular dependency.
     """
 
-    def __init__(self) -> None:
-        self.message = "The formula has a circular dependency"
+    def __init__(
+        self,
+        message: Optional[
+            str
+        ] = "\nThe formula can't be evaluated: it has a circular dependency\n",
+    ) -> None:
+        self.message = message
 
 
 class ExpressionPostfixEvaluationException(Exception):

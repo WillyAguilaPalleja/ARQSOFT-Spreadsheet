@@ -30,11 +30,11 @@ class Text:
         self.text_value = text_value
 
     def get_text_value(self) -> str:
-        return self.text_value if self.text_value != '' else '0'
+        return self.text_value if self.text_value != "" else "0"
 
     def get_value_as_number(self) -> Number:
-        text_value = self.value.get_text_value()
-        if text_value == '':
+        text_value = self.get_text_value()
+        if text_value == "":
             return Number(number_value=0.0)
         return Number(number_value=float(text_value))
 
@@ -98,7 +98,7 @@ class TextualContent(Content):
         @raises NumericalRepresentationException: Raises if the value can not be converted to float (e.g. the value "Hello world").
         """
         text_value = self.value.get_text_value()
-        if text_value == '':
+        if text_value == "":
             return Number(number_value=0.0)
         return Number(number_value=float(text_value))
 

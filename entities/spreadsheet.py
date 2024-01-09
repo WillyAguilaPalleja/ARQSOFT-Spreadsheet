@@ -11,7 +11,11 @@ from entities.content import (
     Cell,
 )
 from entities.formula import Formula
-from exceptions.exceptions import BadCommandException, SpreadsheetLocationException
+from exceptions.exceptions import (
+    BadCommandException,
+    SpreadsheetLocationException,
+    CircularDependencyException,
+)
 from utils import help_message
 
 
@@ -47,7 +51,9 @@ class Spreadsheet:
         dependencies = []
         if isinstance(content, Formula):
             # Example: extract cell references from the formula
-            dependencies = re.findall(r"[A-Za-z][A-Za-z0-9]*[0-9]*", content.value.get_text_value())
+            dependencies = re.findall(
+                r"[A-Za-z][A-Za-z0-9]*[0-9]*", content.value.get_text_value()
+            )
         return dependencies
 
     def evaluate_spreadsheet(self) -> None:
@@ -86,7 +92,7 @@ class Spreadsheet:
 
     def display_spreadsheet(self):
         beginning_and_end_of_line = (
-                "+------------------------------+\n" + "-" * 30 + "+\n"
+            "+------------------------------+\n" + "-" * 30 + "+\n"
         )
         cell_string = beginning_and_end_of_line
 
@@ -116,7 +122,7 @@ class UserInterface:
             try:
                 command = input("Enter a command: ")
                 read_command = self.controller.read_command(command)
-                if not read_command:
+                if read_command == "quit":
                     user_wants_to_quit = True
             except BadCommandException as exception:
                 print(exception.message)
@@ -162,31 +168,19 @@ class SpreadsheetController:
                 case AvailableCommandsEnum.C:
                     return self.create_spreadsheet()
                 case AvailableCommandsEnum.E:
-                    return self.edit_cell(
+                    self.edit_cell(
                         cell_coordinate=command_splitted[1],
                         new_cell_content=command_splitted[2],
                     )
+                    self.spreadsheet.display_spreadsheet()
                 case AvailableCommandsEnum.L:
-                    self.spreadsheet.evaluate_spreadsheet()
-
                     # Display the current state of the spreadsheet
                     self.spreadsheet.display_spreadsheet()
                     return True
 
                     # return self.load_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.S:
-                    self.spreadsheet.list_of_cells[0].content = Number(4)
-                    self.spreadsheet.list_of_cells[1].content = Number(4)
-                    formula = Formula(
-                        formula_content=Text(text_value="=sum(9;9)+A1"),
-                        spreadsheet_cells=self.spreadsheet.list_of_cells,
-                        operators_in_formula=[],
-                        operands_in_formula=[],
-                    )
-                    formula.get_formula_result()
-
-                    return True
-                    # return self.save_spreadsheet(path_name=command_splitted[1])
+                    return self.save_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.Q:
                     return self.exit()
                 case _:
@@ -196,6 +190,8 @@ class SpreadsheetController:
                 message="The command input is not valid: not enough arguments were given"
                 + str(e)
             )
+        except CircularDependencyException as e:
+            print(e.message)
 
     def create_spreadsheet(self) -> Spreadsheet:
         """
@@ -228,7 +224,7 @@ class SpreadsheetController:
         @param new_cell_content: New content of the cell.
         @return: None
         """
-        # CHECK IF CELL EXISTS AND OTHER THINGS
+
         for cell in self.spreadsheet.list_of_cells:
             if cell.cell_id == cell_coordinate:
                 if new_cell_content.strip()[0] == "=":
@@ -258,7 +254,6 @@ class SpreadsheetController:
         """
         print("Closing the application")
         time.sleep(1)
-        return None
 
 
 class SpreadsheetFactory:

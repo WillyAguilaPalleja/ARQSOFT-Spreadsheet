@@ -1,6 +1,7 @@
 from typing import List, Tuple, Any, Union
 import re
 
+from exceptions.exceptions import CircularDependencyException
 from .content import Content, Text, Operand, Cell, Number
 from .function import SumFunction, MinFunction, AverageFunction, MaxFunction, Function
 from .operator import Operator
@@ -25,50 +26,61 @@ class Formula(Content):
 
     def replace_cell_reference(self, match: re.Match) -> str:
         cell_id = match.group(0).upper()
-        print(f"Cell id: {cell_id}, type: {type(cell_id)}")
         for cell in self.spreadsheet_cells:
             if cell.cell_id == cell_id:
-                print(f"Cell content: {cell.content}")
-                if isinstance(cell.content, Formula):
-                    return str(cell.content.get_formula_result() if cell.content.get_formula_result() else 0.0)
-                elif isinstance(cell.content, Number):
+                if cell.content and isinstance(cell.content, Formula):
+                    return str(cell.content.get_formula_result())
+                elif cell.content and isinstance(cell.content, Number):
                     return str(cell.content.get_number_value())
-                elif isinstance(cell.content, Text):
+                elif cell.content and isinstance(cell.content, Text):
                     return cell.content.get_text_value()
+                else:
+                    return '0.0'
 
     def replace_cells_reference_in_formula(self, text_value: str) -> str:
         pattern = re.compile(r"[A-Za-z][A-Za-z0-9]*[0-9]*")
         while re.search(pattern, text_value):
-            text_value = re.sub(pattern=pattern, repl=self.replace_cell_reference, string=text_value)
+            text_value = re.sub(
+                pattern=pattern, repl=self.replace_cell_reference, string=text_value
+            )
         return text_value
 
     def replace_numbers_in_functions(self, text_value: str) -> str:
         pattern = re.compile(r"([A-Za-z][A-Za-z0-9;]*)\(([^)]*)\)")
 
         def replace_argument(arg: str) -> str:
-            return self.replace_cell_reference(arg.strip()) \
-                if isinstance(arg, str) and re.match(r"^[A-Za-z](?:[1-9]|[1-9][0-9]|100)$", arg.strip()) \
+            return (
+                self.replace_cell_reference(re.search(r"[A-Za-z][A-Za-z0-9]*[0-9]*", arg.strip()))
+                if isinstance(arg, str)
+                   and re.match(r"^[A-Za-z](?:[1-9]|[1-9][0-9]|100)$", arg.strip())
                 else arg
+            )
 
         def replace_numbers(match: re.Match) -> str:
             function_name = match.group(1)
-            function_arguments = match.group(2).split(';')
+            function_arguments = match.group(2).split(";")
 
             function_arguments = [replace_argument(arg) for arg in function_arguments]
-            function_arguments = [Number(number_value=float(eval(arg))) for arg in function_arguments]
+            function_arguments = [
+                Number(number_value=float(arg)) if arg != '' else Number(number_value=0.0)
+                for arg in function_arguments
+            ]
 
-            print(f"Function arguments: {[argument.get_number_value() for argument in function_arguments]}")
-            print(f"Function name: {function_name}")
-
-            function_result = float(self.get_function_instance(function_name.upper()).get_result(function_arguments))
+            function_result = float(
+                self.get_function_instance(function_name.upper()).get_result(
+                    function_arguments
+                )
+            )
             return str(function_result)
 
         while re.search(pattern, text_value):
-            text_value = re.sub(pattern=pattern, repl=replace_numbers, string=text_value)
+            text_value = re.sub(
+                pattern=pattern, repl=replace_numbers, string=text_value
+            )
 
         return text_value
 
-    def tokenize_formula(self) -> List[Tuple[str, str, str]]:
+    def tokenize_formula(self) -> List[Tuple[str, str]]:
         list_of_tokens = []
         pattern = re.compile(
             r"\s*([A-Za-z][A-Za-z0-9;]*)|(\d+(\.\d*)?)|([+\-*/();])\s*"
@@ -77,25 +89,18 @@ class Formula(Content):
         text_value = self.value.get_text_value()
         text_value = text_value[1:]
 
-        #text_value = self.replace_cells_reference_in_formula(text_value)
-        print(f"Text value: {text_value}")
-
-        # Replace numbers inside functions recursively
         text_value = self.replace_numbers_in_functions(text_value)
-        print(f"Text value: {text_value}")
         text_value = self.replace_cells_reference_in_formula(text_value)
-        print(f"Text value: {text_value}")
 
         for match in pattern.finditer(text_value):
             identifier, number, _, operator = match.groups()
             if identifier and identifier.upper() in {"SUM", "MAX", "MIN", "AVERAGE"}:
-                list_of_tokens.append(("function", identifier.upper(), '0'))
+                list_of_tokens.append(("function", identifier.upper()))
             elif number:
-                list_of_tokens.append(("number", number, '0'))
+                list_of_tokens.append(("number", number))
             elif operator:
-                list_of_tokens.append(("operator", operator, '0'))
+                list_of_tokens.append(("operator", operator))
 
-        print(f"List of tokens: {list_of_tokens}")
         return list_of_tokens
 
     def extract_function_content(self, text_value: str) -> str:
@@ -105,7 +110,7 @@ class Formula(Content):
         start_index = text_value.find("(")
         end_index = text_value.find(")")
         if start_index != -1 and end_index != -1:
-            return text_value[start_index + 1:end_index]
+            return text_value[start_index + 1: end_index]
         else:
             return "0"
 
@@ -124,9 +129,8 @@ class Formula(Content):
                 return 0
 
         tokens = self.tokenize_formula()
-        print(f"Tokens: {tokens}")
 
-        for token_type, value, function_content in tokens:
+        for token_type, value in tokens:
             if token_type == "number":
                 output.append(float(value))
             elif token_type == "operator":
@@ -149,7 +153,6 @@ class Formula(Content):
         stack = []
 
         postfix_expression = self.generate_postfix_expression()
-        print(f"Postfix expression: {postfix_expression}")
 
         for token in postfix_expression:
             if isinstance(token, float):
@@ -157,7 +160,7 @@ class Formula(Content):
             elif isinstance(token, str):
                 self.handle_operator(token, stack)
             elif isinstance(token, tuple):
-                type, operator = token
+                _type, operator = token
                 self.handle_operator(operator, stack)
 
         return stack[0] if stack else None
@@ -165,30 +168,32 @@ class Formula(Content):
     def parse_function_arguments(self, function_content: str) -> List[Number]:
         # Implement logic to parse function arguments
         # Here, I'm assuming arguments are separated by ';'
-        argument_values = function_content.split(';')
+        argument_values = function_content.split(";")
 
         # Special case for MIN and MAX functions
-        if argument_values and ',' in argument_values[0]:
+        if argument_values and "," in argument_values[0]:
             # Handle MIN and MAX with multiple arguments
-            return [Number(number_value=float(arg)) for arg in argument_values[0].split(',')]
+            return [
+                Number(number_value=float(arg)) for arg in argument_values[0].split(",")
+            ]
         else:
             # Handle other functions with a single list of arguments
             return [Number(number_value=float(value)) for value in argument_values]
 
     def handle_operator(self, operator: str, stack: List[Any]):
-        if operator == '+':
+        if operator == "+":
             operand2 = stack.pop()
             operand1 = stack.pop()
             stack.append(operand1 + operand2)
-        elif operator == '-':
+        elif operator == "-":
             operand2 = stack.pop()
             operand1 = stack.pop()
             stack.append(operand1 - operand2)
-        elif operator == '*':
+        elif operator == "*":
             operand2 = stack.pop()
             operand1 = stack.pop()
             stack.append(operand1 * operand2)
-        elif operator == '/':
+        elif operator == "/":
             operand2 = stack.pop()
             operand1 = stack.pop()
             stack.append(operand1 / operand2)
@@ -211,10 +216,12 @@ class Formula(Content):
         @raises CircularDependencyException: Raises if there is a circular dependency in the formula.
         @raises ExpressionPostfixEvaluationException: Raises if there is an error evaluating the postfix expression in the formula.
         """
-        result = self.evaluate_postfix()
-        self.formula_result = result
-        print(f"Formula result: {result}")
-        return result
+        try:
+            result = self.evaluate_postfix()
+            self.formula_result = result
+            return result
+        except RecursionError:
+            raise CircularDependencyException()
 
     # Implementing get_value function from superclass and overwriting it to get_formula_result
     get_value_as_number = get_formula_result
