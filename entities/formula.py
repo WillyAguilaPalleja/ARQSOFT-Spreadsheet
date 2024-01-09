@@ -36,6 +36,7 @@ class Formula(Content):
                     return cell.content.get_text_value()
                 else:
                     return '0.0'
+        return '0.0'
 
     def replace_cells_reference_in_formula(self, text_value: str) -> str:
         pattern = re.compile(r"[A-Za-z][A-Za-z0-9]*[0-9]*")
@@ -53,7 +54,7 @@ class Formula(Content):
                 self.replace_cell_reference(re.search(r"[A-Za-z][A-Za-z0-9]*[0-9]*", arg.strip()))
                 if isinstance(arg, str)
                    and re.match(r"^[A-Za-z](?:[1-9]|[1-9][0-9]|100)$", arg.strip())
-                else arg
+                else arg if arg != '' else '0.0'
             )
 
         def replace_numbers(match: re.Match) -> str:

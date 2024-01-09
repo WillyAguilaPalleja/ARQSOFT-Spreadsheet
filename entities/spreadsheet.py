@@ -1,6 +1,7 @@
+import re
 import time
 from enum import Enum
-from typing import List, re
+from typing import List
 
 from entities.content import (
     TextualContent,
@@ -149,7 +150,6 @@ class SpreadsheetController:
         @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name or the file did not exist.
         """
 
-        # DOES NOT WORK WITH SEVERAL LINES
         def read_command_from_a_file(path_name: str):
             try:
                 with open(path_name, "r") as file:
@@ -174,11 +174,7 @@ class SpreadsheetController:
                     )
                     self.spreadsheet.display_spreadsheet()
                 case AvailableCommandsEnum.L:
-                    # Display the current state of the spreadsheet
-                    self.spreadsheet.display_spreadsheet()
-                    return True
-
-                    # return self.load_spreadsheet(path_name=command_splitted[1])
+                    return self.load_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.S:
                     return self.save_spreadsheet(path_name=command_splitted[1])
                 case AvailableCommandsEnum.Q:
@@ -201,12 +197,64 @@ class SpreadsheetController:
         pass
 
     def load_spreadsheet(self, path_name: str) -> Spreadsheet:
-        """
-        @summary: Loads a spreadsheet given its route using the method load_spreadsheet from SpreadsheetLoader.
-        @param path_name: Path where the spreadsheet to be loaded is located.
-        @return: Spreadsheet.
-        """
-        pass
+        spreadsheet = Spreadsheet()
+
+        list_of_cells = [
+            Cell(cell_id=f"{chr(65 + col_index)}{row_index + 1}", content=TextualContent(value=Text(text_value="")))
+            for row_index in range(100) for col_index in range(26)
+        ]
+        spreadsheet.list_of_cells = list_of_cells
+
+        print(f"Attempting to read from file: {path_name}")
+
+        with open(path_name, "r") as file:
+            row_index = 0
+
+            for line in file:
+                line = line.strip()
+                line_values = line.split(";")
+                print(f"Line {row_index}: {line_values}")
+
+                for col_index, cell_content in enumerate(line_values[:26]):
+                    print(f"Attempting to parse cell content: {cell_content}")
+
+                    parsed_content = self.parse_s2v_content(cell_content)
+
+                    index = row_index * 26 + col_index
+                    list_of_cells[index].content = parsed_content
+
+                    print(f"Cell {list_of_cells[index].cell_id}: {parsed_content}")
+
+                row_index += 1
+                if row_index >= 100:
+                    break
+
+        for row in range(row_index, 100):
+            for col_index in range(26):
+                index = row * 26 + col_index
+                list_of_cells[index].content = TextualContent(value=Text(text_value=""))
+
+        self.spreadsheet = spreadsheet
+        spreadsheet.list_of_cells = list_of_cells
+
+        spreadsheet.display_spreadsheet()
+        return spreadsheet
+
+    @staticmethod
+    def parse_s2v_content(s2v_content: str) -> Content:
+        # Remove leading and trailing whitespaces from the content
+        s2v_content = s2v_content.strip()
+
+        # Check if the content is a formula (starts with '=')
+        if s2v_content.startswith('='):
+            return Formula(formula_content=Text(text_value=s2v_content.replace(',', ';')), spreadsheet_cells=[],
+                           operators_in_formula=[], operands_in_formula=[])
+        # Check if the content is numeric
+        elif s2v_content.replace('.', '', 1).isdigit():
+            return NumericalContent(value=Number(number_value=float(s2v_content)))
+        # If not a formula or numeric, treat it as textual content
+        else:
+            return TextualContent(value=Text(text_value=s2v_content))
 
     def save_spreadsheet(self, path_name: str) -> None:
         """
