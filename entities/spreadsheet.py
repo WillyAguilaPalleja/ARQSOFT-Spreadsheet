@@ -1,7 +1,7 @@
 import re
 import time
 from enum import Enum
-from typing import List
+from typing import List, Any
 
 from entities.content import (
     TextualContent,
@@ -263,7 +263,54 @@ class SpreadsheetController:
         @return: None.
         @raise SpreadsheetLocationException: Raises if any spreadsheet was found in path_name or the file did not exist.
         """
-        pass
+        # Open the file in write mode to overwrite existing content or create a new file
+        with open(path_name, "w") as file:
+            for row_index in range(100):
+                row_string = ''
+
+                for col_index in range(26):
+                    index = row_index * 26 + col_index
+                    cell = self.spreadsheet.list_of_cells[index]
+
+                    if isinstance(cell.content, Formula):
+                        if isinstance(cell.content.value, Text):
+                            row_string += f"{cell.content.value.get_text_value().replace(';', ', ')};"
+                        else:
+                            row_string += f'{cell.content.value.get_number_value()};'
+
+                    elif isinstance(cell.content, NumericalContent):
+                        # Check if it's the first value in the row
+                        if row_string == '':
+                            row_string += f'{cell.content.value.get_number_value()}'
+                        else:
+                            row_string += f';{cell.content.value.get_number_value()}'
+
+                    elif isinstance(cell.content, TextualContent):
+                        text_value = f'{cell.content.value.get_text_value()}'
+                        if text_value in ['0', '0.0', 'None', '']:
+                            row_string += ';'
+                        else:
+                            row_string += f'{text_value};'
+
+                # Remove trailing semicolons from the right
+                row_list = row_string.split(';')
+                print(row_list)
+                row_list = self.remove_trailing_zeros(row_list)
+                row_string = ';'.join(value if value != '' else '' for value in row_list)
+
+                if len(row_list) > 0:
+                    file.write(f"{row_string}\n")
+                else:
+                    file.write('\n')
+
+        # Close the file
+        file.close()
+
+    def remove_trailing_zeros(self, row_list: List[str]):
+        i = len(row_list) - 1
+        while i >= 0 and row_list[i] == '':
+            i -= 1
+        return row_list[:i + 1]
 
     def edit_cell(self, cell_coordinate: str, new_cell_content: str) -> Content:
         """
@@ -288,10 +335,10 @@ class SpreadsheetController:
                     return cell.content
                 try:
                     new_cell_content = float(new_cell_content)
-                    cell.content = Number(number_value=new_cell_content)
+                    cell.content = NumericalContent(value=Number(number_value=new_cell_content))
 
                 except ValueError:
-                    cell.content = Text(text_value=new_cell_content)
+                    cell.content = TextualContent(Text(text_value=new_cell_content))
                 print(type(cell.content))
                 return cell.content
 

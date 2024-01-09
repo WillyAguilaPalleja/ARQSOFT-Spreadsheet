@@ -2,7 +2,7 @@ from typing import List, Tuple, Any, Union
 import re
 
 from exceptions.exceptions import CircularDependencyException
-from .content import Content, Text, Operand, Cell, Number
+from .content import Content, Text, Operand, Cell, Number, NumericalContent
 from .function import SumFunction, MinFunction, AverageFunction, MaxFunction, Function
 from .operator import Operator
 
@@ -164,7 +164,7 @@ class Formula(Content):
                 _type, operator = token
                 self.handle_operator(operator, stack)
 
-        return stack[0] if stack else None
+        return NumericalContent(value=Number(number_value=stack[0])) if stack else None
 
     def parse_function_arguments(self, function_content: str) -> List[Number]:
         # Implement logic to parse function arguments
