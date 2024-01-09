@@ -204,6 +204,7 @@ class SpreadsheetController:
             for row_index in range(100) for col_index in range(26)
         ]
         spreadsheet.list_of_cells = list_of_cells
+        self.spreadsheet = spreadsheet
 
         print(f"Attempting to read from file: {path_name}")
 
@@ -218,7 +219,7 @@ class SpreadsheetController:
                 for col_index, cell_content in enumerate(line_values[:26]):
                     print(f"Attempting to parse cell content: {cell_content}")
 
-                    parsed_content = self.parse_s2v_content(cell_content)
+                    parsed_content = self.parse_s2v_content(cell_content, list_of_cells)
 
                     index = row_index * 26 + col_index
                     list_of_cells[index].content = parsed_content
@@ -234,20 +235,17 @@ class SpreadsheetController:
                 index = row * 26 + col_index
                 list_of_cells[index].content = TextualContent(value=Text(text_value=""))
 
-        self.spreadsheet = spreadsheet
-        spreadsheet.list_of_cells = list_of_cells
-
         spreadsheet.display_spreadsheet()
         return spreadsheet
 
     @staticmethod
-    def parse_s2v_content(s2v_content: str) -> Content:
+    def parse_s2v_content(s2v_content: str, list_of_cells: List[Cell]) -> Content:
         # Remove leading and trailing whitespaces from the content
         s2v_content = s2v_content.strip()
 
         # Check if the content is a formula (starts with '=')
         if s2v_content.startswith('='):
-            return Formula(formula_content=Text(text_value=s2v_content.replace(',', ';')), spreadsheet_cells=[],
+            return Formula(formula_content=Text(text_value=s2v_content.replace(',', ';')), spreadsheet_cells=list_of_cells,
                            operators_in_formula=[], operands_in_formula=[])
         # Check if the content is numeric
         elif s2v_content.replace('.', '', 1).isdigit():
@@ -255,6 +253,13 @@ class SpreadsheetController:
         # If not a formula or numeric, treat it as textual content
         else:
             return TextualContent(value=Text(text_value=s2v_content))
+
+    @staticmethod
+    def remove_trailing_semicolons(row_list: List[str]):
+        i = len(row_list) - 1
+        while i >= 0 and row_list[i] == '':
+            i -= 1
+        return row_list[:i + 1]
 
     def save_spreadsheet(self, path_name: str) -> None:
         """
@@ -294,8 +299,7 @@ class SpreadsheetController:
 
                 # Remove trailing semicolons from the right
                 row_list = row_string.split(';')
-                print(row_list)
-                row_list = self.remove_trailing_zeros(row_list)
+                row_list = self.remove_trailing_semicolons(row_list)
                 row_string = ';'.join(value if value != '' else '' for value in row_list)
 
                 if len(row_list) > 0:
@@ -306,12 +310,6 @@ class SpreadsheetController:
         # Close the file
         file.close()
 
-    def remove_trailing_zeros(self, row_list: List[str]):
-        i = len(row_list) - 1
-        while i >= 0 and row_list[i] == '':
-            i -= 1
-        return row_list[:i + 1]
-
     def edit_cell(self, cell_coordinate: str, new_cell_content: str) -> Content:
         """
         @summary: Edits the cell given its coordinates and places the new content given using the method edit_cell from CellEdition.
@@ -321,6 +319,10 @@ class SpreadsheetController:
         """
 
         for cell in self.spreadsheet.list_of_cells:
+            if isinstance(cell.content, Formula):
+                print(f"Formula Content: {cell.content}")
+                print(f"Tokenization: {cell.content.tokenize_formula()}")
+
             if cell.cell_id == cell_coordinate:
                 if new_cell_content.strip()[0] == "=":
                     cell.content = Formula(
@@ -331,6 +333,7 @@ class SpreadsheetController:
                     )
                     for cell in self.spreadsheet.list_of_cells:
                         if isinstance(cell.content, Formula):
+                            print(cell.content)
                             cell.content.get_formula_result()
                     return cell.content
                 try:

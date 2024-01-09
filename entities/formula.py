@@ -2,7 +2,7 @@ from typing import List, Tuple, Any, Union
 import re
 
 from exceptions.exceptions import CircularDependencyException
-from .content import Content, Text, Operand, Cell, Number, NumericalContent
+from .content import Content, Text, Operand, Cell, Number, NumericalContent, TextualContent
 from .function import SumFunction, MinFunction, AverageFunction, MaxFunction, Function
 from .operator import Operator
 
@@ -30,10 +30,10 @@ class Formula(Content):
             if cell.cell_id == cell_id:
                 if cell.content and isinstance(cell.content, Formula):
                     return str(cell.content.get_formula_result())
-                elif cell.content and isinstance(cell.content, Number):
-                    return str(cell.content.get_number_value())
-                elif cell.content and isinstance(cell.content, Text):
-                    return cell.content.get_text_value()
+                elif cell.content and isinstance(cell.content, NumericalContent):
+                    return str(cell.content.get_value_as_number().get_number_value())
+                elif cell.content and isinstance(cell.content, TextualContent):
+                    return cell.content.get_value_as_text().get_text_value()
                 else:
                     return '0.0'
         return '0.0'
