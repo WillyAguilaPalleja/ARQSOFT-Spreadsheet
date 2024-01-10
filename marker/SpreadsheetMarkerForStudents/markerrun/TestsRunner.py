@@ -16,7 +16,7 @@ class TestRunner:
         path6 = 'marker.SpreadsheetMarkerForStudents.markerrun.save_test.SaveTest'
         path7 = 'marker.SpreadsheetMarkerForStudents.markerrun.load_test.LoadTest'
 
-        paths = [path5]
+        paths = [path1, path2, path3, path4, path5, path6, path7]
         self.toBeRun = paths
         self.porcentajes = [3,3,39,15,10,12.5,12.5]
         self.clasesAPorcentajes = {} #mapa <string (clase),float (porcentaje)>
