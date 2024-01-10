@@ -263,8 +263,10 @@ class SpreadsheetController:
             for col_index in range(26):
                 index = row * 26 + col_index
                 list_of_cells[index].content = TextualContent(value=Text(text_value=""))
-
-        spreadsheet.display_spreadsheet()
+        try:
+            spreadsheet.display_spreadsheet()
+        except SyntaxErrorInFormulaException as e:
+            print(e.message)
         return spreadsheet
 
     @staticmethod
@@ -275,8 +277,6 @@ class SpreadsheetController:
             return Formula(
                 formula_content=Text(text_value=s2v_content.replace(",", ";")),
                 spreadsheet_cells=list_of_cells,
-                operators_in_formula=[],
-                operands_in_formula=[],
             )
         elif s2v_content.replace(".", "", 1).isdigit():
             return NumericalContent(value=Number(number_value=float(s2v_content)))
@@ -322,14 +322,14 @@ class SpreadsheetController:
                         if isinstance(cell.content.value, Text):
                             row_string += f"{cell.content.value.get_text_value().replace(';', ', ')};"
                         else:
-                            row_string += f"{cell.content.value.get_number_value()};"
+                            row_string += f"{cell.content.value.get_text_value()};"
 
                     elif isinstance(cell.content, NumericalContent):
                         # Check if it's the first value in the row
                         if row_string == "":
-                            row_string += f"{cell.content.value.get_number_value()}"
+                            row_string += f"{int(cell.content.get_value_as_number().get_number_value())};"
                         else:
-                            row_string += f";{cell.content.value.get_number_value()}"
+                            row_string += f"{int(cell.content.get_value_as_number().get_number_value())};"
 
                     elif isinstance(cell.content, TextualContent):
                         text_value = f"{cell.content.value.get_text_value()}"
@@ -341,10 +341,11 @@ class SpreadsheetController:
                 # Remove trailing semicolons from the right
                 row_list = row_string.split(";")
                 row_list = self.remove_trailing_semicolons(row_list)
+                if len(row_list) and row_list[-1] == ';':
+                    row_list = row_list[:-1]
                 row_string = ";".join(
                     value if value != "" else "" for value in row_list
                 )
-
                 if len(row_list) > 0:
                     file.write(f"{row_string}\n")
                 else:
@@ -367,14 +368,17 @@ class SpreadsheetController:
 
         for cell in self.spreadsheet.list_of_cells:
             if cell.cell_id == cell_coordinate:
-                if new_cell_content.strip()[0] == "=":
+                if isinstance(new_cell_content, str) and new_cell_content.strip()[0] == "=":
                     cell.content = Formula(
                         formula_content=Text(text_value=new_cell_content),
                         spreadsheet_cells=self.spreadsheet.list_of_cells,
                     )
                     for cell in self.spreadsheet.list_of_cells:
                         if isinstance(cell.content, Formula):
-                            cell.content.get_formula_result()
+                            try:
+                                cell.content.get_formula_result()
+                            except SyntaxErrorInFormulaException as e:
+                                raise e
                 try:
                     new_cell_content_to_float = float(new_cell_content)
                     cell.content = NumericalContent(

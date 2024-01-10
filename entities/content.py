@@ -71,8 +71,6 @@ class NumericalContent(Content, Argument):
     def __lt__(self, other):
         return self.value.get_number_value() < other
 
-    def __repr__(self) -> str:
-        return str(self.value.number_value)
 
     def get_value_as_number(self) -> Number:
         """

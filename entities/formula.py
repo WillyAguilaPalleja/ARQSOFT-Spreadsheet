@@ -82,9 +82,13 @@ class Formula(Content):
         pattern = re.compile(r"([A-Za-z][A-Za-z0-9;]*)\(([^)]*)\)")
         inside_function = [False]
 
-        def get_cells_in_range(start_cell, end_cell, spreadsheet_cells):
-            start_col, start_row = start_cell[0], int(start_cell[1:])
-            end_col, end_row = end_cell[0], int(end_cell[1:])
+        def get_cells_in_range(start_cell, end_cell):
+            try:
+                start_col, start_row = start_cell[0], int(start_cell[1:])
+                end_col, end_row = end_cell[0], int(end_cell[1:])
+            except ValueError:
+                #  If the cell reference is not valid, raise an exception
+                raise SyntaxErrorInFormulaException()
 
             cells_in_range = []
             for cell in self.spreadsheet_cells:
@@ -103,7 +107,7 @@ class Formula(Content):
 
                 # Get cells in the range
                 cell_range = get_cells_in_range(
-                    start_cell, end_cell, self.spreadsheet_cells
+                    start_cell, end_cell
                 )
 
                 # Create a CellRange object
@@ -182,6 +186,8 @@ class Formula(Content):
             text_value = self.replace_numbers_in_functions(text_value)
         except KeyError:
             raise SyntaxErrorInFormulaException()
+        except SyntaxErrorInFormulaException as e:
+            raise e
         text_value = self.replace_cells_reference_in_formula(text_value)
 
         for match in pattern.finditer(text_value):
@@ -191,7 +197,7 @@ class Formula(Content):
             elif number:
                 list_of_tokens.append(("number", number))
             elif operator:
-                if operator not in OperatorEnum.__members__.values():
+                if operator not in OperatorEnum.__members__.values() and operator not in '()':
                     raise SyntaxErrorInFormulaException()
                 list_of_tokens.append(("operator", operator))
 
@@ -232,22 +238,23 @@ class Formula(Content):
             if token_type == "number":
                 output.append(float(value))
             elif token_type == "operator":
-                while stack and precedence(stack[-1][1]) >= precedence(value):
-                    output.append(stack.pop())
-                stack.append(("operator", value))
-            elif value == "(":
-                stack.append(("operator", value))
-            elif value == ")":
-                while stack and stack[-1][1] != "(":
-                    output.append(stack.pop())
-                stack.pop()  # Pop "("
+                if value == "(":
+                    stack.append(("operator", value))
+                elif value == ")":
+                    while stack and stack[-1][1] != "(":
+                        output.append(stack.pop())
+                    stack.pop()  # Pop the open parenthesis
+                else:
+                    while stack and precedence(stack[-1][1]) >= precedence(value):
+                        output.append(stack.pop())
+                    stack.append(("operator", value))
 
         while stack:
             output.append(stack.pop())
 
         return output
 
-    def evaluate_postfix(self) -> Any:
+    def evaluate_postfix(self) -> NumericalContent | None:
         stack = []
 
         postfix_expression = self.generate_postfix_expression()
@@ -286,10 +293,7 @@ class Formula(Content):
         operand1 = stack.pop()
 
         if operator == OperatorEnum.ADD:
-            if isinstance(operand1, str) and isinstance(operand2, str):
-                stack.append(operand1 + operand2)
-            else:
-                stack.append(operand1 + operand2)
+            stack.append(operand1 + operand2)
         elif operator == OperatorEnum.SUBTRACT:
             stack.append(operand1 - operand2)
         elif operator == OperatorEnum.MULTIPLY:
@@ -321,7 +325,7 @@ class Formula(Content):
         try:
             result = self.evaluate_postfix()
             self.formula_result = result
-            return result
+            return result.get_value_as_number().get_number_value()
         except SyntaxErrorInFormulaException as e:
             raise e
         except TokenizationFormatInFormulaException as e:

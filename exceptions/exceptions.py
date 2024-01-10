@@ -7,7 +7,7 @@ class BadCommandException(Exception):
     """
 
     def __init__(
-        self, message: Optional[str] = "The command input is not valid"
+        self, message: Optional[str] = "\nThe command input is not valid\n"
     ) -> None:
         self.message = message
 
@@ -18,7 +18,7 @@ class SpreadsheetLocationException(Exception):
     """
 
     def __init__(
-        self, message: Optional[str] = "The spreadsheet location is not valid"
+        self, message: Optional[str] = "\nThe spreadsheet location is not valid\n"
     ) -> None:
         self.message = message
 
@@ -29,7 +29,7 @@ class NoCellException(Exception):
     """
 
     def __init__(self) -> None:
-        self.message = "The cell with the given coordinates does not exist"
+        self.message = "\nThe cell with the given coordinates does not exist\n"
 
 
 class NumericalRepresentationException(Exception):
@@ -39,7 +39,7 @@ class NumericalRepresentationException(Exception):
 
     def __init__(self) -> None:
         self.message = (
-            "The value of the cell does not have a valid numerical representation"
+            "\nThe value of the cell does not have a valid numerical representation\n"
         )
 
 
@@ -49,7 +49,7 @@ class TokenizationFormatInFormulaException(Exception):
     """
 
     def __init__(self) -> None:
-        self.message = "The format of the formula is not valid"
+        self.message = "\nThe format of the formula is not valid\n"
 
 
 class SyntaxErrorInFormulaException(Exception):
@@ -58,7 +58,7 @@ class SyntaxErrorInFormulaException(Exception):
     """
 
     def __init__(self) -> None:
-        self.message = "The formula has a syntax error"
+        self.message = "\nThe formula has a syntax error\n"
 
 
 class ValueErrorInFormulaException(Exception):
@@ -67,7 +67,7 @@ class ValueErrorInFormulaException(Exception):
     """
 
     def __init__(self) -> None:
-        self.message = "One of the values of the formula is not valid"
+        self.message = "\nOne of the values of the formula is not valid\n"
 
 
 class CircularDependencyException(Exception):
