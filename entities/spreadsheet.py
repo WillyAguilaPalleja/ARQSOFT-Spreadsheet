@@ -43,51 +43,13 @@ class Spreadsheet:
             self.controller = SpreadsheetFactory.create_spreadsheet_controller()
             self.list_of_cells = SpreadsheetFactory.create_list_of_cells()
 
-    def build_dependency_graph(self) -> None:
-        # Build a directed acyclic graph (DAG) based on cell dependencies
-        # You may need to adapt this based on your specific implementation
-        for cell in self.list_of_cells:
-            dependencies = self.find_dependencies(cell.content)
-            self.dependency_graph[cell.cell_id] = dependencies
-
-    def find_dependencies(self, content: Content) -> List[str]:
-        # Implement logic to find dependencies for a given content
-        # You may need to adapt this based on your specific implementation
-        dependencies = []
-        if isinstance(content, Formula):
-            # Example: extract cell references from the formula
-            dependencies = re.findall(
-                r"[A-Za-z][A-Za-z0-9]*[0-9]*", content.value.get_text_value()
-            )
-        return dependencies
-
     def evaluate_spreadsheet(self) -> None:
-        # Topologically sort the cells based on dependencies
         evaluation_order = self.topological_sort()
 
-        # Evaluate cells in the determined order
         for cell_id in evaluation_order:
             cell = self.find_cell_by_id(cell_id)
             if cell and isinstance(cell.content, Formula):
                 cell.content.get_formula_result()
-
-    def topological_sort(self) -> List[str]:
-        # Implement topological sorting algorithm
-        # You may need to adapt this based on your specific implementation
-        visited = set()
-        order = []
-
-        def visit(cell_id: str):
-            if cell_id not in visited:
-                visited.add(cell_id)
-                for dependency in self.dependency_graph.get(cell_id, []):
-                    visit(dependency)
-                order.append(cell_id)
-
-        for cell_id in self.dependency_graph.keys():
-            visit(cell_id)
-
-        return order
 
     def find_cell_by_id(self, cell_id: str) -> Cell | None:
         for cell in self.list_of_cells:
@@ -325,7 +287,6 @@ class SpreadsheetController:
                             row_string += f"{cell.content.value.get_text_value()};"
 
                     elif isinstance(cell.content, NumericalContent):
-                        # Check if it's the first value in the row
                         if row_string == "":
                             row_string += f"{int(cell.content.get_value_as_number().get_number_value())};"
                         else:
@@ -338,10 +299,9 @@ class SpreadsheetController:
                         else:
                             row_string += f"{text_value};"
 
-                # Remove trailing semicolons from the right
                 row_list = row_string.split(";")
                 row_list = self.remove_trailing_semicolons(row_list)
-                if len(row_list) and row_list[-1] == ';':
+                if len(row_list) and row_list[-1] == ";":
                     row_list = row_list[:-1]
                 row_string = ";".join(
                     value if value != "" else "" for value in row_list
@@ -351,7 +311,6 @@ class SpreadsheetController:
                 else:
                     file.write("\n")
 
-        # Close the file
         file.close()
 
     def edit_cell(self, cell_coordinate: str, new_cell_content: str) -> None:
@@ -368,7 +327,10 @@ class SpreadsheetController:
 
         for cell in self.spreadsheet.list_of_cells:
             if cell.cell_id == cell_coordinate:
-                if isinstance(new_cell_content, str) and new_cell_content.strip()[0] == "=":
+                if (
+                    isinstance(new_cell_content, str)
+                    and new_cell_content.strip()[0] == "="
+                ):
                     cell.content = Formula(
                         formula_content=Text(text_value=new_cell_content),
                         spreadsheet_cells=self.spreadsheet.list_of_cells,

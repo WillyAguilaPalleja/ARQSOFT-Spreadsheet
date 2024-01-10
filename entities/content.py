@@ -71,7 +71,6 @@ class NumericalContent(Content, Argument):
     def __lt__(self, other):
         return self.value.get_number_value() < other
 
-
     def get_value_as_number(self) -> Number:
         """
         @summary: Returns the numerical value of the cell.

@@ -101,16 +101,11 @@ class Formula(Content):
             return cells_in_range
 
         def replace_argument(arg: str) -> List[float] | str:
-            # Handle range arguments
             if ":" in arg:
                 start_cell, end_cell = arg.split(":")
 
-                # Get cells in the range
-                cell_range = get_cells_in_range(
-                    start_cell, end_cell
-                )
+                cell_range = get_cells_in_range(start_cell, end_cell)
 
-                # Create a CellRange object
                 cell_range_obj = CellRange(cells_in_range=cell_range)
 
                 values = []
@@ -158,17 +153,13 @@ class Formula(Content):
         for match in pattern.finditer(text_value):
             identifier, _ = match.groups()
             if identifier and identifier.upper() in {"SUM", "MAX", "MIN", "AVERAGE"}:
-                inside_function[
-                    0
-                ] = True  # Set inside_function to True when entering a function
+                inside_function[0] = True
 
-            # Replace cell references and evaluate numbers
         while re.search(pattern, text_value):
             text_value = re.sub(
                 pattern=pattern, repl=replace_numbers, string=text_value
             )
 
-            # Check if there's any cell range outside a function
         if ":" in text_value and not inside_function[0]:
             raise SyntaxErrorInFormulaException()
 
@@ -197,7 +188,10 @@ class Formula(Content):
             elif number:
                 list_of_tokens.append(("number", number))
             elif operator:
-                if operator not in OperatorEnum.__members__.values() and operator not in '()':
+                if (
+                    operator not in OperatorEnum.__members__.values()
+                    and operator not in "()"
+                ):
                     raise SyntaxErrorInFormulaException()
                 list_of_tokens.append(("operator", operator))
 
@@ -208,9 +202,6 @@ class Formula(Content):
         return list_of_tokens
 
     def extract_function_content(self, text_value: str) -> str:
-        # Implement logic to extract the content of the function
-        # You can use regular expressions or any other method
-        # Here, I'm providing a simple example assuming arguments are separated by ';'
         start_index = text_value.find("(")
         end_index = text_value.find(")")
         if start_index != -1 and end_index != -1:
@@ -243,7 +234,7 @@ class Formula(Content):
                 elif value == ")":
                     while stack and stack[-1][1] != "(":
                         output.append(stack.pop())
-                    stack.pop()  # Pop the open parenthesis
+                    stack.pop()
                 else:
                     while stack and precedence(stack[-1][1]) >= precedence(value):
                         output.append(stack.pop())
@@ -274,18 +265,13 @@ class Formula(Content):
         return NumericalContent(value=Number(number_value=stack[0])) if stack else None
 
     def parse_function_arguments(self, function_content: str) -> List[Number]:
-        # Implement logic to parse function arguments
-        # Here, I'm assuming arguments are separated by ';'
         argument_values = function_content.split(";")
 
-        # Special case for MIN and MAX functions
         if argument_values and "," in argument_values[0]:
-            # Handle MIN and MAX with multiple arguments
             return [
                 Number(number_value=float(arg)) for arg in argument_values[0].split(",")
             ]
         else:
-            # Handle other functions with a single list of arguments
             return [Number(number_value=float(value)) for value in argument_values]
 
     def handle_operator(self, operator: str, stack: List[Any]):
