@@ -2,9 +2,14 @@ from enum import Enum
 from typing import List, Tuple, Any, Union
 import re
 
-from exceptions.exceptions import CircularDependencyException, SyntaxErrorInFormulaException, \
-    TokenizationFormatInFormulaException, ExpressionPostfixEvaluationException, NumericalRepresentationException, \
-    ValueErrorInFormulaException
+from exceptions.exceptions import (
+    CircularDependencyException,
+    SyntaxErrorInFormulaException,
+    TokenizationFormatInFormulaException,
+    ExpressionPostfixEvaluationException,
+    NumericalRepresentationException,
+    ValueErrorInFormulaException,
+)
 from .content import (
     Content,
     Text,
@@ -12,10 +17,17 @@ from .content import (
     Cell,
     Number,
     NumericalContent,
-    TextualContent, CellRange,
+    TextualContent,
+    CellRange,
 )
 from .function import SumFunction, MinFunction, AverageFunction, MaxFunction, Function
-from .operator import Operator, SumOperator, SubstractionOperator, MultiplyOperator, DivisionOperator
+from .operator import (
+    Operator,
+    SumOperator,
+    SubstractionOperator,
+    MultiplyOperator,
+    DivisionOperator,
+)
 
 
 class OperatorEnum(str, Enum):
@@ -30,13 +42,9 @@ class Formula(Content):
         self,
         formula_content: Text,
         spreadsheet_cells: List[Cell],
-        operators_in_formula: List[Operator],
-        operands_in_formula: List[Operand],
     ) -> None:
         super().__init__(value=formula_content)
         self.spreadsheet_cells = spreadsheet_cells
-        self.operators_in_formula = operators_in_formula
-        self.operands_in_formula = operands_in_formula
         self.formula_result = None
 
     def __str__(self) -> str:
@@ -50,9 +58,13 @@ class Formula(Content):
                     if cell.content and isinstance(cell.content, Formula):
                         return str(cell.content.get_formula_result())
                     elif cell.content and isinstance(cell.content, NumericalContent):
-                        return str(cell.content.get_value_as_number().get_number_value())
+                        return str(
+                            cell.content.get_value_as_number().get_number_value()
+                        )
                     elif cell.content and isinstance(cell.content, TextualContent):
-                        return str(cell.content.get_value_as_number().get_number_value())
+                        return str(
+                            cell.content.get_value_as_number().get_number_value()
+                        )
                     else:
                         raise SyntaxErrorInFormulaException()
         except NumericalRepresentationException:
@@ -68,6 +80,7 @@ class Formula(Content):
 
     def replace_numbers_in_functions(self, text_value: str) -> str:
         pattern = re.compile(r"([A-Za-z][A-Za-z0-9;]*)\(([^)]*)\)")
+        inside_function = [False]
 
         def get_cells_in_range(start_cell, end_cell, spreadsheet_cells):
             start_col, start_row = start_cell[0], int(start_cell[1:])
@@ -75,10 +88,12 @@ class Formula(Content):
 
             cells_in_range = []
             for cell in self.spreadsheet_cells:
-                if start_col <= cell.cell_id[0] <= end_col and start_row <= int(cell.cell_id[1:]) <= end_row:
+                if (
+                    start_col <= cell.cell_id[0] <= end_col
+                    and start_row <= int(cell.cell_id[1:]) <= end_row
+                ):
                     cells_in_range.append(cell)
 
-            print([cell.cell_id for cell in cells_in_range])
             return cells_in_range
 
         def replace_argument(arg: str) -> List[float] | str:
@@ -87,20 +102,25 @@ class Formula(Content):
                 start_cell, end_cell = arg.split(":")
 
                 # Get cells in the range
-                cell_range = get_cells_in_range(start_cell, end_cell, self.spreadsheet_cells)
+                cell_range = get_cells_in_range(
+                    start_cell, end_cell, self.spreadsheet_cells
+                )
 
                 # Create a CellRange object
                 cell_range_obj = CellRange(cells_in_range=cell_range)
-
 
                 values = []
                 for cell in cell_range_obj.cells_in_range:
                     if isinstance(cell.content, Formula):
                         values.append(cell.content.get_formula_result())
                     elif isinstance(cell.content, TextualContent):
-                        values.append(cell.content.get_value_as_number().get_number_value())
+                        values.append(
+                            cell.content.get_value_as_number().get_number_value()
+                        )
                     elif isinstance(cell.content, NumericalContent):
-                        values.append(cell.content.get_value_as_number().get_number_value())
+                        values.append(
+                            cell.content.get_value_as_number().get_number_value()
+                        )
                     else:
                         values.append(0.0)
                 return values
@@ -120,20 +140,33 @@ class Formula(Content):
 
             function_arguments = [replace_argument(arg) for arg in function_arguments]
             function_arguments = [
-                arg if arg != "" else Number(number_value=0.0) for arg in function_arguments
+                arg if arg != "" else Number(number_value=0.0)
+                for arg in function_arguments
             ]
-            print(function_arguments)
 
-            function_result = self.get_function_instance(function_name.upper()).get_result(
-                function_arguments
-            )
+            function_result = self.get_function_instance(
+                function_name.upper()
+            ).get_result(function_arguments)
 
+            inside_function[0] = False
             return str(function_result)
 
+        for match in pattern.finditer(text_value):
+            identifier, _ = match.groups()
+            if identifier and identifier.upper() in {"SUM", "MAX", "MIN", "AVERAGE"}:
+                inside_function[
+                    0
+                ] = True  # Set inside_function to True when entering a function
+
+            # Replace cell references and evaluate numbers
         while re.search(pattern, text_value):
             text_value = re.sub(
                 pattern=pattern, repl=replace_numbers, string=text_value
             )
+
+            # Check if there's any cell range outside a function
+        if ":" in text_value and not inside_function[0]:
+            raise SyntaxErrorInFormulaException()
 
         return text_value
 

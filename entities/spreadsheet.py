@@ -95,16 +95,32 @@ class Spreadsheet:
                 return cell
         return None
 
-    def display_spreadsheet(self):
-        beginning_and_end_of_line = (
-            "+------------------------------+\n" + "-" * 400 + "+\n"
-        )
-        cell_string = beginning_and_end_of_line
+    def display_spreadsheet(self, current_cell_id: str = None):
+        beginning_of_line = "\033[1;32m|\033[0m"
+        beginning_of_line_bold = "\033[1;32;1m|\033[0m"
+        horizontal_line = "\033[1;34m" + "-" * (26 * 40) + "\033[0m"
+        end_of_line = "\033[1;32m|\033[0m\n"
+        cell_string = beginning_of_line + horizontal_line + end_of_line
 
-        for index, cell in enumerate(self.list_of_cells):
-            cell_string += f"| {cell.cell_id}: {str(cell.content)} "
-            if (index + 1) % 26 == 0:
-                cell_string += "|\n" + beginning_and_end_of_line
+        for row_index in range(1, 101):
+            cell_string += beginning_of_line_bold
+            for col_index in range(1, 27):
+                cell_id = f"{chr(64 + col_index)}{row_index}"
+                cell = self.find_cell_by_id(cell_id)
+
+                if cell and cell.content:
+                    content_str = str(cell.content)
+                else:
+                    content_str = ""
+
+                if cell_id == current_cell_id:
+                    cell_string += f"\033[1;37;45m {f'{cell_id}:'} \033[0m{beginning_of_line_bold}\033[1;37;45m{content_str:^38}\033[0m{beginning_of_line_bold}"
+                else:
+                    cell_string += f"{content_str:^38}{beginning_of_line_bold}"
+
+            cell_string += (
+                end_of_line + beginning_of_line + horizontal_line + end_of_line
+            )
 
         print(cell_string)
 
@@ -206,6 +222,7 @@ class SpreadsheetController:
         @return: None.
         """
         self.spreadsheet = Spreadsheet()
+        self.spreadsheet.list_of_cells = SpreadsheetFactory.create_list_of_cells()
         self.spreadsheet.display_spreadsheet()
 
     def load_spreadsheet(self, path_name: str) -> Spreadsheet:
@@ -354,12 +371,9 @@ class SpreadsheetController:
                     cell.content = Formula(
                         formula_content=Text(text_value=new_cell_content),
                         spreadsheet_cells=self.spreadsheet.list_of_cells,
-                        operators_in_formula=[],
-                        operands_in_formula=[],
                     )
                     for cell in self.spreadsheet.list_of_cells:
                         if isinstance(cell.content, Formula):
-                            print(cell.content)
                             cell.content.get_formula_result()
                 try:
                     new_cell_content_to_float = float(new_cell_content)
